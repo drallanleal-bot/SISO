@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Medicina Ocupacional | Software MVP</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="auth-locked">
+    <section class="login-screen" id="loginScreen">
+      <div class="login-watermark" aria-hidden="true">SISO</div>
+      <form class="login-card" id="loginForm">
+        <div class="login-logo">
+          <img src="./assets/company-logo.jpeg" alt="Industrias Alimenticias Kern's Heineken" />
+        </div>
+        <p class="eyebrow">Acceso privado</p>
+        <h1>SISTEMA INTEGRAL DE SALUD OCUPACIONAL</h1>
+        <p class="login-subtitle">Ingresa con tu usuario autorizado para continuar.</p>
+        <label>Usuario<input id="loginUser" type="text" autocomplete="username" placeholder="Usuario" /></label>
+        <label>Contrasena<input id="loginPassword" type="password" autocomplete="current-password" placeholder="Contrasena" /></label>
+        <label class="remember-row"><input id="rememberUser" type="checkbox" checked /> Recordar usuario en este equipo</label>
+        <button class="primary-button" type="submit">Entrar</button>
+        <div class="login-error" id="loginError" role="alert"></div>
+      </form>
+    </section>
+
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark" id="brandMark">
+          <span id="brandInitials">MO</span>
+          <img id="brandPhoto" src="./assets/drleal.png" alt="Foto de usuario" />
+        </div>
+        <div>
+          <h1>SISO</h1>
+          <p>Sistema Integral de Salud Ocupacional</p>
+        </div>
+      </div>
+      <nav class="nav">
+        <a href="#vacunaciones" class="active" data-module="vacunaciones">Vacunaciones</a>
+        <a href="#fenix" data-module="fenix">Resultados FENIX</a>
+        <a href="#programas" data-module="programas">Programas futuros</a>
+        <a href="#respaldos" data-module="respaldos">Respaldos</a>
+      </nav>
+      <div class="sidebar-note">
+        <span id="activeUserLabel">Version MVP</span>
+        <p>Base actual: vacunaciones confiables, Head Count vigente y respaldos manuales.</p>
+        <button class="sidebar-logout" id="logoutButton">Cerrar sesion</button>
+      </div>
+    </aside>
+
+    <main class="app">
+      <section class="topbar">
+        <div>
+          <p class="eyebrow">Software interactivo</p>
+          <h2>SISTEMA INTEGRAL DE SALUD OCUPACIONAL (SISO)</h2>
+        </div>
+        <div class="generated" id="generatedAt">Cargando...</div>
+      </section>
+
+      <section class="module-tabs">
+        <button class="module-tab active" data-module="vacunaciones">Vacunaciones</button>
+        <button class="module-tab" data-module="fenix">Resultados FENIX</button>
+        <button class="module-tab" data-module="programas">Programas futuros</button>
+        <button class="module-tab" data-module="respaldos">Respaldos</button>
+      </section>
+
+      <section id="vacunaciones" class="module active">
+        <section class="kpi-grid" id="kpiGrid"></section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3>Filtros de vacunacion</h3>
+              <p>Filtra por ano, vacuna, estado, gerencia o busca por codigo, nombre, area o tipo.</p>
+            </div>
+            <button class="ghost-button" id="resetFilters">Limpiar filtros</button>
+          </div>
+          <div class="filters">
+            <label>Ano<select id="yearFilter"></select></label>
+            <label>Vacuna<select id="vaccineFilter"></select></label>
+            <label>Estado<select id="statusFilter"></select></label>
+            <label>Gerencia<select id="managementFilter"></select></label>
+            <label class="search-label">Buscar<input id="searchInput" type="search" placeholder="Codigo, nombre, area, tipo..." /></label>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3>Comparativo contra Head Count actual</h3>
+              <p id="comparisonHelp">Selecciona una vacuna y un ano para ver vacunados y no vacunados segun Head Count actual.</p>
+            </div>
+            <button class="ghost-button" id="downloadComparisonExcel">Exportar Excel</button>
+          </div>
+          <div class="comparison-grid" id="comparisonCards"></div>
+          <div class="table-wrap compact">
+            <table>
+              <thead>
+                <tr>
+                  <th>Codigo</th>
+                  <th>Nombre</th>
+                  <th>Gerencia</th>
+                  <th>Vacuna/Ano</th>
+                  <th>Estado comparativo</th>
+                  <th>Detalle</th>
+                </tr>
+              </thead>
+              <tbody id="comparisonTable"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="split">
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <h3>Cobertura por vacuna</h3>
+                <p>Vista rapida de registros por tipo de vacuna.</p>
+              </div>
+            </div>
+            <div class="bar-list" id="vaccineBars"></div>
+          </article>
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <h3>Estados actuales</h3>
+                <p>Distribucion del resultado filtrado.</p>
+              </div>
+            </div>
+            <div class="status-list" id="statusList"></div>
+          </article>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3>Personas y jornadas</h3>
+              <p id="resultCount">0 registros</p>
+            </div>
+            <button class="primary-button" id="downloadRecordsExcel">Exportar Excel</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Codigo</th>
+                  <th>Nombre</th>
+                  <th>Vacuna</th>
+                  <th>Ano</th>
+                  <th>Estado</th>
+                  <th>Gerencia / Area</th>
+                  <th>Tipo</th>
+                </tr>
+              </thead>
+              <tbody id="recordsTable"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3>Matriz por colaborador</h3>
+              <p>Activos del Head Count frente a las jornadas confiables.</p>
+            </div>
+            <button class="ghost-button" id="downloadMatrixExcel">Exportar Excel</button>
+          </div>
+          <div class="table-wrap compact">
+            <table>
+              <thead>
+                <tr>
+                  <th>Codigo</th>
+                  <th>Nombre</th>
+                  <th>Gerencia</th>
+                  <th>VHA 2023</th>
+                  <th>Influenza 2025</th>
+                  <th>Sarampion 2026</th>
+                </tr>
+              </thead>
+              <tbody id="matrixTable"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="split">
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <h3>Fuentes incluidas</h3>
+                <p>Datos que entran al software MVP.</p>
+              </div>
+              <button class="ghost-button" id="downloadSourcesExcel">Exportar Excel</button>
+            </div>
+            <div id="sourcesList" class="source-list"></div>
+          </article>
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <h3>Pendiente de validar</h3>
+                <p>No entra a indicadores oficiales todavia.</p>
+              </div>
+              <button class="ghost-button" id="downloadExcludedExcel">Exportar Excel</button>
+            </div>
+            <div id="excludedList" class="source-list warning"></div>
+          </article>
+        </section>
+      </section>
+
+      <section id="fenix" class="module">
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3>Resultados FENIX</h3>
+              <p>Modulo preparado para cargar resultados ocupacionales, tamizajes o reportes clinicos.</p>
+            </div>
+          </div>
+          <div class="empty-state">
+            <strong>Sin datos cargados todavia</strong>
+            <span>Cuando tengamos el Excel o fuente FENIX, se agregaran filtros por fecha, tipo de resultado, colaborador, area y estado.</span>
+          </div>
+        </section>
+      </section>
+
+      <section id="programas" class="module">
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3>Programas futuros</h3>
+              <p>Espacio para ampliar el software sin rehacerlo desde cero.</p>
+            </div>
+          </div>
+          <div class="program-grid">
+            <article class="program-card"><strong>Audiometrias</strong><span>Control por fecha, resultado, seguimiento y area.</span></article>
+            <article class="program-card"><strong>Nutricion</strong><span>Evaluaciones, planes, riesgo y controles periodicos.</span></article>
+            <article class="program-card"><strong>Diabeticos</strong><span>Seguimiento metabolico, alertas y cumplimiento.</span></article>
+            <article class="program-card"><strong>Charlas y capacitaciones</strong><span>Cronograma anual, asistencia y cobertura.</span></article>
+          </div>
+        </section>
+      </section>
+
+      <section id="respaldos" class="module">
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3>Respaldos</h3>
+              <p>Genera una copia de seguridad con fecha, datos y estado de filtros.</p>
+            </div>
+          </div>
+          <div class="backup-actions">
+            <button class="primary-button" id="backupToFolder">Seleccionar carpeta y guardar respaldo</button>
+            <button class="ghost-button" id="downloadBackup">Descargar respaldo JSON</button>
+          </div>
+          <div class="backup-box" id="backupStatus">
+            Listo para generar respaldo. En Edge/Chrome puedes seleccionar una carpeta de OneDrive si el navegador lo permite.
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="./app.js?v=siso-login-20260715-1"></script>
+  </body>
+</html>
