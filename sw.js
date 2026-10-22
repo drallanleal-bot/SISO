@@ -2,7 +2,7 @@
 // Siempre pide primero la version nueva a internet; la copia guardada solo se usa sin conexion.
 // Solo guarda los archivos propios del sistema (codigo, estilos, iconos).
 // NUNCA guarda datos de colaboradores: esos se leen de la carpeta empresarial de OneDrive.
-const CACHE = 'siso-app-v3';
+const CACHE = 'siso-app-v4';
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.add('./')).then(() => self.skipWaiting()));

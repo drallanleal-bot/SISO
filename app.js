@@ -17,7 +17,11 @@ if ("serviceWorker" in navigator && (location.protocol === "https:" || ["localho
 
 const IT_DEMO_MODE = new URLSearchParams(window.location.search).get("demo") === "it";
 
-const VACCINATION_CSV_HEADERS = ["codigo", "nombre", "vacuna", "anio", "estado", "gerencia", "tipo", "fuente"];
+const VACCINATION_CSV_HEADERS = ["codigo", "nombre", "vacuna", "anio", "estado", "gerencia", "tipo", "fuente", "fecha", "dosis"];
+
+// Esquema de Hepatitis B en adultos: 3 dosis.
+const HEPB_DOSES_REQUIRED = 3;
+const HEPB_NAME = "Hepatitis B";
 
 const EMPTY_DATA = {
   generated_at: "Modo local seguro: sin datos reales incluidos",
@@ -153,6 +157,8 @@ function recordsToCsv(records) {
     record.gerencia || record.area || "",
     record.tipo || "",
     record.fuente || "",
+    record.fecha || "",
+    record.dosis || "",
   ]);
   return `\ufeff${[VACCINATION_CSV_HEADERS, ...rows].map((row) => row.map(csvEscape).join(",")).join("\r\n")}`;
 }
@@ -165,7 +171,142 @@ function recordKey(record) {
     String(record.anio || ""),
     normalizeText(record.estado),
     normalizeText(record.fuente),
+    String(record.fecha || ""),
+    String(record.dosis || ""),
   ].join("|");
+}
+
+// Acepta 02-10-26, 02/10/2026, 2026-10-02 o fecha de Excel. Devuelve AAAA-MM-DD o "".
+function normalizeDate(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  let m = text.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+  if (m) return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+  m = text.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);
+  if (m) {
+    const year = m[3].length === 2 ? `20${m[3]}` : m[3];
+    return `${year}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  }
+  m = text.match(/^(\d{4})[-/.](\d{1,2})$/);
+  if (m) return `${m[1]}-${m[2].padStart(2, "0")}`;
+  return "";
+}
+
+function formatDate(value) {
+  const text = String(value || "");
+  let m = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+  m = text.match(/^(\d{4})-(\d{2})$/);
+  if (m) return `${m[2]}/${m[1]}`;
+  return text;
+}
+
+function recordWhen(record) {
+  return record.fecha ? formatDate(record.fecha) : String(record.anio || "Sin fecha");
+}
+
+function personKey(record) {
+  const code = normalizeText(record.codigo);
+  if (code && code !== "s/c") return `c:${code}`;
+  return `n:${normalizeText(record.nombre || record.nombre_listado).replace(/\s+/g, " ")}`;
+}
+
+function isHepB(record) {
+  return normalizeText(record.vacuna).replace(/\s+/g, " ") === "hepatitis b";
+}
+
+function isAppliedDose(record) {
+  const status = normalizeText(record.estado);
+  return !["no vacunado", "pendiente oficial", "sin registro", "no listado", "revisar"].includes(status);
+}
+
+function doseSortValue(record) {
+  return `${record.fecha || `${record.anio || 0}-00-00`}|${String(record.dosis || "").padStart(2, "0")}`;
+}
+
+// Historial de dosis de Hepatitis B por persona (codigo o, si no tiene, nombre).
+function hepBHistories() {
+  const byPerson = new Map();
+  state.data.records.filter((r) => isHepB(r) && isAppliedDose(r)).forEach((record) => {
+    const key = personKey(record);
+    if (!byPerson.has(key)) byPerson.set(key, []);
+    byPerson.get(key).push(record);
+  });
+  const result = new Map();
+  byPerson.forEach((records, key) => {
+    const seen = new Set();
+    const doses = records
+      .slice()
+      .sort((a, b) => doseSortValue(a).localeCompare(doseSortValue(b)))
+      .filter((r) => {
+        const id = r.fecha ? `f:${r.fecha}` : `s:${normalizeText(r.fuente)}|${r.anio}|${r.dosis || ""}`;
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      })
+      .map((r, index) => ({ record: r, numero: Number(r.dosis) || index + 1 }));
+    result.set(key, doses);
+  });
+  return result;
+}
+
+function hepBDoseFor(record, histories) {
+  if (!isHepB(record)) return "";
+  const doses = histories.get(personKey(record)) || [];
+  const found = doses.find((d) => d.record === record) || doses.find((d) => recordKey(d.record) === recordKey(record));
+  return found ? `${found.numero}ª` : "";
+}
+
+function renderHepBPanel() {
+  const panel = $("hepbPanel");
+  if (!panel) return;
+  const { query } = currentFilters();
+  if (!query || query.length < 3) {
+    panel.hidden = true;
+    return;
+  }
+  const histories = hepBHistories();
+  const people = new Map();
+  state.data.records.filter((r) => recordMatchesQuery(r, query)).forEach((r) => {
+    const key = personKey(r);
+    if (!people.has(key)) people.set(key, r);
+  });
+  state.data.headcount.filter((p) => recordMatchesQuery(p, query)).forEach((p) => {
+    const key = personKey(p);
+    if (!people.has(key)) people.set(key, p);
+  });
+  const list = [...people.entries()].slice(0, 30);
+  panel.hidden = false;
+  if (!list.length) {
+    $("hepbList").innerHTML = '<p class="hepb-empty">Sin personas que coincidan con la busqueda.</p>';
+    return;
+  }
+  $("hepbList").innerHTML = list
+    .map(([key, person]) => {
+      const doses = histories.get(key) || [];
+      const count = doses.length;
+      const complete = count >= HEPB_DOSES_REQUIRED;
+      const statusLabel = complete ? "Esquema completo" : count ? `Faltan ${HEPB_DOSES_REQUIRED - count}` : "Sin dosis registradas";
+      const statusClass = complete ? "" : count ? "pending" : "missing";
+      const doseItems = doses
+        .map((d) => `<li><strong>${d.numero}ª dosis</strong><span>${escapeHtml(recordWhen(d.record))}</span><small>${escapeHtml(d.record.fuente || "")}</small></li>`)
+        .join("");
+      return `
+        <article class="hepb-card">
+          <header>
+            <div>
+              <strong>${escapeHtml(person.nombre || person.nombre_listado || "Sin nombre")}</strong>
+              <span>${escapeHtml(person.codigo || "S/C")}</span>
+            </div>
+            <div class="hepb-count">
+              <b>${count} de ${HEPB_DOSES_REQUIRED}</b>
+              <span class="badge ${statusClass}">${statusLabel}</span>
+            </div>
+          </header>
+          ${doseItems ? `<ol class="hepb-doses">${doseItems}</ol>` : ""}
+        </article>`;
+    })
+    .join("");
 }
 
 function mergeVaccinationRecords(existing, incoming) {
@@ -404,6 +545,7 @@ function applyFilters() {
   renderTable();
   renderMatrix();
   renderComparison();
+  renderHepBPanel();
 }
 
 function grouped(records, key) {
@@ -444,6 +586,7 @@ function renderCharts() {
 }
 
 function renderTable() {
+  const histories = hepBHistories();
   $("resultCount").textContent = `${formatNumber(state.filtered.length)} registros`;
   $("recordsTable").innerHTML = state.filtered
     .slice(0, 600)
@@ -453,10 +596,11 @@ function renderTable() {
           <td>${record.codigo || "S/C"}</td>
           <td><strong>${record.nombre || record.nombre_listado}</strong><br><span>${record.fuente}</span></td>
           <td>${record.vacuna}</td>
-          <td>${record.anio}</td>
+          <td>${hepBDoseFor(record, histories) || "-"}</td>
+          <td>${escapeHtml(recordWhen(record))}</td>
           <td><span class="badge ${badgeClass(record.estado)}">${record.estado}</span></td>
           <td>${record.gerencia || record.area || "Sin dato"}</td>
-          <td>${record.tipo_persona}</td>
+          <td>${record.tipo_persona || record.tipo || ""}</td>
         </tr>
       `,
     )
@@ -749,6 +893,8 @@ function vaccinationRecordsFromCsv(text, fileName) {
   const managementIndex = findColumn(headers, ["gerencia", "area", "departamento"]);
   const typeIndex = findColumn(headers, ["tipo", "clasificacion"]);
   const sourceIndex = findColumn(headers, ["fuente", "archivo", "origen"]);
+  const dateIndex = findColumn(headers, ["fecha"]);
+  const doseIndex = findColumn(headers, ["dosis"]);
 
   if (nameIndex < 0 && codeIndex < 0) {
     throw new Error("El CSV debe tener al menos columna de nombre o codigo.");
@@ -762,15 +908,19 @@ function vaccinationRecordsFromCsv(text, fileName) {
     .slice(1)
     .map((row) => {
       const rawYear = String(row[yearIndex] || "").trim();
+      const fecha = dateIndex >= 0 ? normalizeDate(row[dateIndex]) : "";
+      const rawDose = doseIndex >= 0 ? String(row[doseIndex] || "").match(/\d+/)?.[0] : "";
       return {
         codigo: String(row[codeIndex] || "").trim(),
         nombre: String(row[nameIndex] || "").trim().toUpperCase(),
         vacuna: String(row[vaccineIndex] || fallbackVaccine).trim(),
-        anio: Number(rawYear.match(/20\d{2}/)?.[0] || fallbackYear),
+        anio: Number(rawYear.match(/20\d{2}/)?.[0] || fecha.slice(0, 4) || fallbackYear),
         estado: String(row[statusIndex] || "Vacunado").trim() || "Vacunado",
         gerencia: String(row[managementIndex] || "").trim().toUpperCase(),
         tipo: String(row[typeIndex] || "Jornada cargada").trim(),
         fuente: String(row[sourceIndex] || fallbackSource).trim(),
+        fecha,
+        dosis: rawDose ? Number(rawDose) : "",
       };
     })
     .filter((record) => record.codigo || record.nombre);
@@ -891,7 +1041,7 @@ function downloadHeadcountTemplate() {
 }
 
 function downloadVaccineTemplate() {
-  const content = "\ufeffcodigo,nombre,vacuna,anio,estado,gerencia,tipo,fuente\n10001,NOMBRE EJEMPLO,Influenza,2026,Vacunado,GERENCIA EJEMPLO,Colaborador activo,Jornada ejemplo\n";
+  const content = "\ufeffcodigo,nombre,vacuna,anio,estado,gerencia,tipo,fuente,fecha,dosis\n10001,NOMBRE EJEMPLO,Hepatitis B,2026,Vacunado,GERENCIA EJEMPLO,Colaborador activo,Jornada ejemplo,02/10/2026,\n";
   const blob = new Blob([content], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -1284,15 +1434,16 @@ async function readableBackupToFolder() {
         vaccineDir,
         `${safeFolderName(vaccine)}_${safeFolderName(year)}_${stamp}.xls`,
         `${vaccine} ${year}`,
-        ["Código", "Nombre", "Vacuna", "Año", "Estado", "Gerencia / Área", "Tipo", "Fuente"],
+        ["Código", "Nombre", "Vacuna", "Dosis", "Fecha / Año", "Estado", "Gerencia / Área", "Tipo", "Fuente"],
         records.map((record) => [
           record.codigo || "S/C",
           record.nombre || record.nombre_listado || "Sin nombre",
           record.vacuna,
-          record.anio,
+          hepBDoseFor(record, hepBHistories()),
+          recordWhen(record),
           record.estado,
           record.gerencia || record.area || "Sin dato",
-          record.tipo_persona,
+          record.tipo_persona || record.tipo || "",
           record.fuente,
         ]),
       );
@@ -1362,18 +1513,20 @@ function downloadExcel(filename, title, headers, rows) {
 }
 
 function exportRecordsExcel() {
+  const histories = hepBHistories();
   downloadExcel(
     "personas_y_jornadas_filtradas.xls",
     "Personas y jornadas",
-    ["Código", "Nombre", "Vacuna", "Año", "Estado", "Gerencia / Área", "Tipo"],
+    ["Código", "Nombre", "Vacuna", "Dosis", "Fecha / Año", "Estado", "Gerencia / Área", "Tipo"],
     state.filtered.map((record) => [
       record.codigo || "S/C",
       `${record.nombre || record.nombre_listado || "Sin nombre"}\n${record.fuente || ""}`,
       record.vacuna,
-      record.anio,
+      hepBDoseFor(record, histories),
+      recordWhen(record),
       record.estado,
       record.gerencia || record.area || "Sin dato",
-      record.tipo_persona,
+      record.tipo_persona || record.tipo || "",
     ]),
   );
 }

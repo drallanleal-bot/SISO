@@ -97,6 +97,8 @@ Usa el boton `Plantilla CSV` en Jornadas de vacunacion. Las columnas esperadas s
 - `gerencia`
 - `tipo`
 - `fuente`
+- `fecha` (opcional, por ejemplo 02/10/2026)
+- `dosis` (opcional; si se deja vacia, SISO numera las dosis de Hepatitis B en orden de fecha)
 
 Si la jornada no trae `estado`, SISO asumira `Vacunado`. Si no trae `anio`, intentara detectarlo desde el nombre del archivo.
 
