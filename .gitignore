@@ -1,0 +1,32 @@
+# SISO - NUNCA subir datos reales de colaboradores a GitHub.
+# Solo se versiona el codigo (index.html, app.js, styles.css, assets, scripts).
+
+# Datos y respaldos
+*.csv
+*.tsv
+*.xlsx
+*.xls
+*.xlsm
+*.pdf
+data.json
+data.local.json
+*.local.json
+siso_respaldo*.json
+CSV_CONVERTIDOS/
+RESPALDO*/
+Respaldos/
+Vacunas/
+Head_Count/
+Fuentes/
+Pendientes_de_validar/
+FENIX/
+Programas/
+
+# Excepcion: el archivo de ejemplo con datos ficticios si se conserva
+!data.sample.json
+
+# Sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+~$*

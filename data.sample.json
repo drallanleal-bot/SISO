@@ -1,0 +1,35 @@
+{
+  "generated_at": "Ejemplo sin datos reales",
+  "summary": {
+    "nota": "Este archivo solo documenta la estructura. No contiene informacion real de colaboradores."
+  },
+  "headcount": [
+    {
+      "codigo": "00001",
+      "nombre": "COLABORADOR EJEMPLO UNO",
+      "gerencia": "GERENCIA EJEMPLO",
+      "ceco": "Centro de costo ejemplo"
+    }
+  ],
+  "records": [
+    {
+      "codigo": "00001",
+      "nombre": "COLABORADOR EJEMPLO UNO",
+      "vacuna": "Ejemplo",
+      "anio": 2026,
+      "estado": "Vacunado",
+      "gerencia": "GERENCIA EJEMPLO",
+      "tipo": "Colaborador activo",
+      "fuente": "Archivo de ejemplo"
+    }
+  ],
+  "sources": [
+    {
+      "anio": 2026,
+      "jornada": "Jornada de ejemplo",
+      "estado": "Ejemplo",
+      "nota": "Sin datos reales"
+    }
+  ],
+  "excluded": []
+}
