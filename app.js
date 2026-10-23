@@ -1083,9 +1083,24 @@ function isFenixIndexCsv(path) {
   return normalized.endsWith("fenix/fenix_indice_resultados_siso.csv") || normalized.endsWith("fenix_indice_resultados_siso.csv");
 }
 
+const NEW_JORNADAS_FOLDER = "Jornadas_nuevas";
+const HISTORY_FOLDER = "Historial";
+const HISTORY_KEEP = 5;
+
+// Carpetas que SISO no lee al cargar: historial de respaldos y archivo viejo.
+function isIgnoredFolder(name) {
+  const normalized = normalizeText(name);
+  return normalized === "historial" || normalized.startsWith("archivo_viejo") || normalized.startsWith("archivo viejo");
+}
+
+function isNewJornadaPath(path) {
+  return normalizeText(path).replaceAll("\\", "/").startsWith(`${normalizeText(NEW_JORNADAS_FOLDER)}/`);
+}
+
 async function collectCsvFiles(directoryHandle, prefix = "") {
   const files = [];
   for await (const [name, handle] of directoryHandle.entries()) {
+    if (handle.kind === "directory" && isIgnoredFolder(name)) continue;
     const path = prefix ? `${prefix}/${name}` : name;
     if (handle.kind === "file" && name.toLowerCase().endsWith(".csv")) {
       files.push({ path, file: await handle.getFile() });
@@ -1108,15 +1123,18 @@ async function loadSisoFolder() {
   try {
     const directory = await window.showDirectoryPicker({ mode: "readwrite" });
     state.sisoDirectoryHandle = directory;
+    await getDirectory(directory, NEW_JORNADAS_FOLDER);
     const csvFiles = await collectCsvFiles(directory);
     const consolidated = csvFiles
-      .filter((item) => isConsolidatedVaccinationCsv(item.path))
+      .filter((item) => !isNewJornadaPath(item.path) && isConsolidatedVaccinationCsv(item.path))
       .sort((a, b) => consolidatedPriority(a) - consolidatedPriority(b) || b.file.lastModified - a.file.lastModified || b.file.size - a.file.size)[0];
     const fenixIndex = csvFiles.find((item) => isFenixIndexCsv(item.path));
     let headcountLoaded = 0;
     let vaccineLoaded = 0;
     let vaccineFiles = 0;
     let fenixLoaded = 0;
+    let newJornadas = 0;
+    let headcountModified = -1;
     state.data.records = [];
     state.data.sources = [];
 
@@ -1124,22 +1142,26 @@ async function loadSisoFolder() {
       const text = await item.file.text();
       const rows = parseCsv(text);
       if (!rows.length) continue;
-      if (isHeadcountCsv(rows[0], item.path)) {
+      if (!isNewJornadaPath(item.path) && isHeadcountCsv(rows[0], item.path)) {
+        // Si hay varios Head Count, se usa el modificado mas recientemente.
+        if (item.file.lastModified < headcountModified) continue;
         const headcount = headcountFromCsv(text);
         if (headcount.length) {
+          headcountModified = item.file.lastModified;
           state.data.headcount = headcount;
           state.headcountSource = `Head Count cargado desde carpeta: ${item.path}`;
           localStorage.setItem("siso_headcount_override", JSON.stringify({ source: state.headcountSource, headcount }));
           headcountLoaded = headcount.length;
         }
-      } else if (!consolidated || item.path === consolidated.path) {
+      } else if (!consolidated || item.path === consolidated.path || isNewJornadaPath(item.path)) {
         const records = vaccinationRecordsFromCsv(text, item.path);
         if (records.length) {
+          if (isNewJornadaPath(item.path)) newJornadas += 1;
           state.data.records = mergeVaccinationRecords(state.data.records, records);
           state.data.sources.push({
             anio: yearFromFileName(item.path),
             jornada: item.path,
-            estado: consolidated && item.path === consolidated.path ? "Consolidado final cargado" : "Cargada desde carpeta SISO",
+            estado: consolidated && item.path === consolidated.path ? "Consolidado final cargado" : isNewJornadaPath(item.path) ? "Jornada nueva incorporada" : "Cargada desde carpeta SISO",
             nota: `${records.length} registros agregados desde CSV local.`,
           });
           vaccineLoaded += records.length;
@@ -1174,7 +1196,7 @@ async function loadSisoFolder() {
     $("vaccineUploadInfo").textContent = vaccineLoaded
       ? `${formatNumber(vaccineLoaded)} registros agregados desde ${formatNumber(vaccineFiles)} archivo(s)`
       : $("vaccineUploadInfo").textContent;
-    status.textContent = `Carpeta revisada: ${formatNumber(csvFiles.length)} CSV. ${consolidated ? "Se uso el consolidado final." : "No habia consolidado final, se leyeron CSV separados."} Head Count: ${headcountLoaded ? formatNumber(headcountLoaded) : "sin cambios"}. Jornadas: ${formatNumber(vaccineLoaded)} registros.`;
+    status.textContent = `Carpeta revisada: ${formatNumber(csvFiles.length)} CSV. ${consolidated ? "Se uso el consolidado final." : "No habia consolidado final, se leyeron CSV separados."}${newJornadas ? ` Jornadas nuevas incorporadas: ${formatNumber(newJornadas)}.` : ""} Head Count: ${headcountLoaded ? formatNumber(headcountLoaded) : "sin cambios"}. Jornadas: ${formatNumber(vaccineLoaded)} registros.`;
     if (fenixLoaded) {
       $("fenixSummary").textContent = `Indice FENIX cargado desde ${fenixIndex.path}: ${formatNumber(fenixLoaded)} resultados PDF disponibles.`;
     }
@@ -1369,6 +1391,18 @@ async function writeTextFile(directory, filename, content, type = "text/plain;ch
   await writable.close();
 }
 
+// Deja solo los N archivos mas recientes del historial.
+async function pruneHistory(directory, keep) {
+  const files = [];
+  for await (const [name, handle] of directory.entries()) {
+    if (handle.kind === "file") files.push({ name, modified: (await handle.getFile()).lastModified });
+  }
+  files.sort((a, b) => b.modified - a.modified);
+  for (const old of files.slice(keep)) {
+    await directory.removeEntry(old.name);
+  }
+}
+
 async function getDirectory(parent, name) {
   return parent.getDirectoryHandle(name, { create: true });
 }
@@ -1411,12 +1445,14 @@ async function readableBackupToFolder() {
     const stamp = backupStamp();
     const vaccinesRoot = await getDirectory(root, "Vacunas");
     await saveConsolidatedIfPossible(root);
+    const historyDir = await getDirectory(vaccinesRoot, HISTORY_FOLDER);
     await writeTextFile(
-      vaccinesRoot,
-      `00_consolidado_final_vacunaciones_siso_${stamp}.csv`,
+      historyDir,
+      `consolidado_vacunaciones_siso_${stamp}.csv`,
       recordsToCsv(state.data.records),
       "text/csv;charset=utf-8",
     );
+    await pruneHistory(historyDir, HISTORY_KEEP);
     const groupedVaccines = state.data.records.reduce((acc, record) => {
       const year = String(record.anio || "Sin año");
       const vaccine = record.vacuna || "Sin vacuna";
@@ -1432,7 +1468,7 @@ async function readableBackupToFolder() {
       const vaccineDir = await getDirectory(yearDir, safeFolderName(vaccine));
       await writeExcelFile(
         vaccineDir,
-        `${safeFolderName(vaccine)}_${safeFolderName(year)}_${stamp}.xls`,
+        `${safeFolderName(vaccine)}_${safeFolderName(year)}.xls`,
         `${vaccine} ${year}`,
         ["Código", "Nombre", "Vacuna", "Dosis", "Fecha / Año", "Estado", "Gerencia / Área", "Tipo", "Fuente"],
         records.map((record) => [
@@ -1452,7 +1488,7 @@ async function readableBackupToFolder() {
     const headcountDir = await getDirectory(root, "Head_Count");
     await writeExcelFile(
       headcountDir,
-      `Head_Count_Actual_${stamp}.xls`,
+      "Head_Count_Actual.xls",
       "Head Count actual",
       ["Código", "Nombre", "Gerencia", "CECO", "Tipo"],
       state.data.headcount.map((person) => [person.codigo, person.nombre, person.gerencia || "Sin dato", person.ceco || "", "Colaborador activo"]),
@@ -1461,7 +1497,7 @@ async function readableBackupToFolder() {
     const sourcesDir = await getDirectory(root, "Fuentes");
     await writeExcelFile(
       sourcesDir,
-      `Fuentes_Incluidas_${stamp}.xls`,
+      "Fuentes_Incluidas.xls",
       "Fuentes incluidas",
       ["Año", "Jornada", "Estado", "Nota"],
       state.data.sources.map((source) => [source.anio, source.jornada, source.estado, source.nota]),
@@ -1470,7 +1506,7 @@ async function readableBackupToFolder() {
     const excludedDir = await getDirectory(root, "Pendientes_de_validar");
     await writeExcelFile(
       excludedDir,
-      `Pendientes_de_validar_${stamp}.xls`,
+      "Pendientes_de_validar.xls",
       "Pendientes de validar",
       ["Año", "Jornada", "Motivo"],
       state.data.excluded.map((source) => [source.anio, source.jornada, source.motivo]),
@@ -1478,7 +1514,7 @@ async function readableBackupToFolder() {
 
     await writeTextFile(
       root,
-      `LEEME_RESPALDO_SISO_${stamp}.txt`,
+      "LEEME_RESPALDO_SISO.txt",
       [
         "RESPALDO LEGIBLE SISO",
         `Fecha de respaldo: ${stamp}`,
@@ -1486,12 +1522,14 @@ async function readableBackupToFolder() {
         "Estructura:",
         "- consolidado_final_vacunaciones_siso.csv: archivo maestro para cargar todas las jornadas en SISO.",
         "- Vacunas / 00_consolidado_final_vacunaciones_siso.csv: copia del consolidado maestro.",
+        `- Vacunas / Historial: copias fechadas del consolidado (solo se conservan las ultimas ${HISTORY_KEEP}).`,
+        "- Jornadas_nuevas: aqui se guarda cada jornada nueva en CSV; SISO la agrega al consolidado al seleccionar la carpeta.",
         "- Vacunas / Año / Vacuna: archivos Excel por jornada o grupo de vacuna.",
         "- Head_Count: base laboral actual usada para cruces.",
         "- Fuentes: archivos incluidos en indicadores.",
         "- Pendientes_de_validar: archivos que no entran aun a indicadores oficiales.",
         "",
-        "Nota: estos archivos son para continuidad operativa. El sistema web usa data.json como respaldo tecnico.",
+        "Cada respaldo reemplaza estos archivos por la version actual; ya no se crean copias repetidas.",
       ].join("\n"),
     );
 

@@ -33,6 +33,20 @@ SISO revisara los CSV dentro de la carpeta y subcarpetas. Si detecta Head Count,
 
 Si existe `consolidado_final_vacunaciones_siso.csv`, SISO usara ese archivo como maestro de jornadas y evitara cargar de nuevo los CSV separados. Esto evita duplicados y hace que en el futuro solo debas seleccionar la carpeta SISO.
 
+## Donde guardar una jornada nueva
+
+1. Guarda el CSV de la jornada dentro de `RESPALDO DE SISO/Jornadas_nuevas` (SISO crea esa carpeta la primera vez que seleccionas la carpeta SISO).
+2. Abre SISO y presiona `Seleccionar carpeta SISO`.
+3. SISO agrega la jornada al consolidado maestro sin duplicar registros, aunque la vuelvas a cargar.
+
+Si hay varios Head Count en la carpeta, SISO usa el modificado mas recientemente.
+
+Las carpetas `Vacunas/Historial` y cualquier carpeta que empiece con `Archivo_viejo` no se leen al cargar: sirven para guardar copias antiguas sin que afecten los datos.
+
+## Respaldos sin duplicados
+
+`Guardar respaldo legible` reemplaza los archivos por su version actual (por vacuna y año, Head Count, Fuentes, Pendientes). Solo se guarda una copia fechada del consolidado por dia en `Vacunas/Historial`, y se conservan las ultimas 5.
+
 ## Convertir Excel a CSV
 
 Para convertir archivos `.xlsx` o `.xls` sin subir datos a internet:
