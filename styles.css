@@ -1527,3 +1527,58 @@ input {
     grid-column: 1 / -1;
   }
 }
+
+/* Usuario en la barra superior */
+.bar-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bar-user-name {
+  color: #d9e7e4;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.bar-avatar {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #37b5a6;
+  color: #fff;
+  font-weight: 800;
+  font-size: 15px;
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  flex: 0 0 auto;
+}
+
+.bar-avatar img {
+  display: none;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 20%;
+}
+
+.drleal-session .bar-avatar {
+  background: #fff;
+}
+
+.drleal-session .bar-avatar img {
+  display: block;
+}
+
+.drleal-session .bar-avatar span {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .bar-user-name {
+    display: none;
+  }
+}

@@ -369,6 +369,15 @@ function showAppForUser(user) {
   document.body.classList.toggle("drleal-session", user.username === "DRLEAL");
   $("activeUserLabel").textContent = `Sesión: ${user.label}`;
   if ($("homeUserName")) $("homeUserName").textContent = user.label;
+  if ($("barUserName")) $("barUserName").textContent = user.label;
+  if ($("barInitials")) {
+    $("barInitials").textContent = user.label
+      .split(/\s+/)
+      .filter((word) => /^[A-Za-z0-9ÁÉÍÓÚÑáéíóúñ]/.test(word))
+      .slice(0, 2)
+      .map((word) => word[0].toUpperCase())
+      .join("");
+  }
   switchModule("inicio");
   $("brandInitials").textContent = user.username === "DRLEAL" ? "" : "MO";
 }
