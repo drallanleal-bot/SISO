@@ -331,6 +331,14 @@ function currentFilters() {
   };
 }
 
+const MODULE_TITLES = {
+  inicio: "Inicio",
+  vacunaciones: "Vacunaciones",
+  fenix: "Resultados FENIX",
+  programas: "Programas",
+  respaldos: "Respaldos",
+};
+
 function switchModule(moduleName) {
   document.querySelectorAll(".module").forEach((module) => {
     module.classList.toggle("active", module.id === moduleName);
@@ -338,6 +346,22 @@ function switchModule(moduleName) {
   document.querySelectorAll("[data-module]").forEach((item) => {
     item.classList.toggle("active", item.dataset.module === moduleName);
   });
+  document.body.dataset.module = moduleName;
+  if ($("mobileModuleTitle")) $("mobileModuleTitle").textContent = MODULE_TITLES[moduleName] || "SISO";
+  if (moduleName === "vacunaciones") closeDetailSection();
+  window.scrollTo({ top: 0 });
+}
+
+function renderHomeStats() {
+  if (!$("homeVacStat")) return;
+  const records = state.data.records.length;
+  const people = state.data.headcount.length;
+  $("homeVacStat").innerHTML = records || people
+    ? `${formatNumber(records)} registros<span class="stat-extra"> · ${formatNumber(people)} en Head Count</span>`
+    : "Sin datos cargados";
+  $("homeFenixStat").textContent = state.fenixRecords.length
+    ? `${formatNumber(state.fenixRecords.length)} resultados disponibles`
+    : "Sin índice cargado";
 }
 
 function showAppForUser(user) {
@@ -345,6 +369,8 @@ function showAppForUser(user) {
   document.body.classList.remove("auth-locked");
   document.body.classList.toggle("drleal-session", user.username === "DRLEAL");
   $("activeUserLabel").textContent = `Sesión: ${user.label}`;
+  if ($("homeUserName")) $("homeUserName").textContent = user.label;
+  switchModule("inicio");
   $("brandInitials").textContent = user.username === "DRLEAL" ? "" : "MO";
 }
 
@@ -546,6 +572,7 @@ function applyFilters() {
   renderMatrix();
   renderComparison();
   renderHepBPanel();
+  renderHomeStats();
 }
 
 function grouped(records, key) {
@@ -1226,24 +1253,53 @@ function handleExcelConvertUpload(event) {
   );
 }
 
-function initDetailSections() {
-  const buttons = document.querySelectorAll("[data-detail]");
-  const panels = document.querySelectorAll(".detail-panel");
-  panels.forEach((panel) => {
+// Secciones de Vacunaciones: se muestran como botones grandes y cada una se abre por separado.
+function closeDetailSection() {
+  const module = $("vacunaciones");
+  if (!module) return;
+  module.classList.remove("detail-open");
+  document.querySelectorAll(".detail-panel").forEach((panel) => {
     panel.classList.remove("active");
     panel.style.display = "none";
   });
   document.querySelectorAll(".section-button").forEach((item) => item.classList.remove("active"));
+}
+
+function openDetailSection(id) {
+  const target = $(id);
+  if (!target) return;
+  closeDetailSection();
+  $("vacunaciones").classList.add("detail-open");
+  target.classList.add("active");
+  target.style.display = "block";
+  document.querySelectorAll(".section-button").forEach((item) => item.classList.toggle("active", item.dataset.detail === id));
+  target.scrollIntoView({ block: "start", behavior: "smooth" });
+}
+
+function initDetailSections() {
+  document.querySelectorAll(".detail-panel").forEach((panel) => {
+    const header = panel.querySelector(".panel-header");
+    if (!header || header.querySelector(".detail-back")) return;
+    const back = document.createElement("button");
+    back.type = "button";
+    back.className = "detail-back";
+    back.innerHTML = "&larr; Secciones";
+    back.addEventListener("click", () => {
+      closeDetailSection();
+      document.querySelector(".section-index")?.scrollIntoView({ block: "start", behavior: "smooth" });
+    });
+    header.prepend(back);
+  });
+  closeDetailSection();
 
   document.addEventListener("click", (event) => {
     const button = event.target.closest("[data-detail]");
     if (!button) return;
-    document.querySelectorAll(".section-button").forEach((item) => item.classList.toggle("active", item === button));
-    document.querySelectorAll(".detail-panel").forEach((panel) => {
-      const isSelected = panel.id === button.dataset.detail;
-      panel.classList.toggle("active", isSelected);
-      panel.style.display = isSelected ? "block" : "none";
-    });
+    if (button.classList.contains("active")) {
+      closeDetailSection();
+      return;
+    }
+    openDetailSection(button.dataset.detail);
   });
 }
 
@@ -1295,6 +1351,7 @@ function renderFenixTable() {
 }
 
 function renderFenix() {
+  renderHomeStats();
   renderFenixFilters();
   applyFenixFilters();
 }
@@ -1623,7 +1680,7 @@ async function init() {
       "Carpeta no seleccionada. La informacion se carga solo desde OneDrive/SharePoint empresarial.";
   }
   state.filtered = state.data.records;
-  $("generatedAt").textContent = `Datos generados: ${state.data.generated_at}`;
+  $("generatedAt").textContent = "";
 
   renderKpis();
   populateFilters();
@@ -1639,6 +1696,7 @@ async function init() {
   });
 
   initDetailSections();
+  $("mobileLogout").addEventListener("click", () => $("logoutButton").click());
 
   ["yearFilter", "vaccineFilter", "statusFilter", "managementFilter", "searchInput"].forEach((id) => {
     $(id).addEventListener("input", applyFilters);

@@ -11,7 +11,7 @@
     <link rel="apple-touch-icon" href="icons/apple-touch-icon-kerns.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="SISO" />
-    <link rel="stylesheet" href="./styles.css?v=siso-20261023-carpetas" />
+    <link rel="stylesheet" href="./styles.css?v=siso-20261024-diseno" />
   </head>
   <body class="auth-locked">
     <section class="login-screen" id="loginScreen">
@@ -43,7 +43,8 @@
         </div>
       </div>
       <nav class="nav">
-        <a href="#vacunaciones" class="active" data-module="vacunaciones">Vacunaciones</a>
+        <a href="#inicio" class="active" data-module="inicio">Inicio</a>
+        <a href="#vacunaciones" data-module="vacunaciones">Vacunaciones</a>
         <a href="#fenix" data-module="fenix">Resultados FENIX</a>
         <a href="#programas" data-module="programas">Programas futuros</a>
         <a href="#respaldos" data-module="respaldos">Respaldos</a>
@@ -55,42 +56,117 @@
       </div>
     </aside>
 
+    <header class="mobile-bar">
+      <div class="bar-inner">
+      <button class="icon-button" data-module="inicio" aria-label="Ir al inicio"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/><path d="M10 19.5v-5h4v5"/></svg></button>
+      <div class="mobile-title"><strong>SISO</strong><span id="mobileModuleTitle">Inicio</span></div>
+      <button class="mobile-logout" id="mobileLogout">Salir</button>
+      </div>
+    </header>
+
     <main class="app">
-      <section class="topbar">
-        <div>
-          <p class="eyebrow">Software local empresarial</p>
-          <h2>SISTEMA INTEGRAL DE SALUD OCUPACIONAL (SISO)</h2>
+
+      <section id="inicio" class="module active">
+        <section class="home-hero">
+          <img class="home-logo" src="./assets/company-logo.jpeg" alt="Industrias Alimenticias Kern's" />
+          <p class="eyebrow">Sistema Integral de Salud Ocupacional</p>
+          <h2>Hola, <span id="homeUserName">bienvenido</span></h2>
+          <p class="home-sub">&iquest;Qu&eacute; quieres revisar hoy?</p>
+        </section>
+        <div class="home-tiles">
+          <button class="home-tile tile-vac" data-module="vacunaciones">
+            <span class="tile-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m17 3 4 4"/><path d="m19 5-3.5 3.5"/><path d="M14 6l4 4-8.5 8.5H5.5v-4z"/><path d="m10 10 2 2"/><path d="M5.5 18.5 3 21"/></svg></span>
+            <strong>Vacunaciones</strong>
+            <span class="tile-text">Jornadas, Head Count, dosis de Hepatitis B y coberturas</span>
+            <span class="tile-stat" id="homeVacStat">Sin datos cargados</span>
+          </button>
+          <button class="home-tile tile-lab" data-module="fenix">
+            <span class="tile-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6"/><path d="M10 3v6l-5.5 9.5A1.7 1.7 0 0 0 6 21h12a1.7 1.7 0 0 0 1.5-2.5L14 9V3"/><path d="M7.5 15h9"/></svg></span>
+            <strong>Resultados FENIX</strong>
+            <span class="tile-text">Laboratorios de colaboradores en PDF</span>
+            <span class="tile-stat" id="homeFenixStat">Sin &iacute;ndice cargado</span>
+          </button>
+          <button class="home-tile tile-backup" data-module="respaldos">
+            <span class="tile-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5C4 5.6 7.6 4 12 4s8 1.6 8 3.5-3.6 3.5-8 3.5-8-1.6-8-3.5Z"/><path d="M4 7.5v4.5c0 1.9 3.6 3.5 8 3.5s8-1.6 8-3.5V7.5"/><path d="M4 12v4.5c0 1.9 3.6 3.5 8 3.5s8-1.6 8-3.5V12"/></svg></span>
+            <strong>Respaldos</strong>
+            <span class="tile-text">Guardar copia legible en OneDrive</span>
+          </button>
+          <button class="home-tile tile-prog" data-module="programas">
+            <span class="tile-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><path d="M16.5 13.5v6M13.5 16.5h6"/></svg></span>
+            <strong>Programas</strong>
+            <span class="tile-text">Audiometr&iacute;as, nutrici&oacute;n, diab&eacute;ticos y charlas</span>
+          </button>
         </div>
-        <div class="generated" id="generatedAt">Cargando...</div>
+        <p class="home-note">Los datos de colaboradores se leen y guardan solo en la carpeta empresarial de OneDrive. <span id="generatedAt"></span></p>
       </section>
 
-      <section class="local-safe-banner">
-        <strong>Modo seguro sin publicacion</strong>
-        <span>Esta version no debe subir datos sensibles a GitHub. Carga Head Count y jornadas desde la carpeta empresarial de OneDrive/SharePoint y guarda alli los respaldos legibles.</span>
-      </section>
+      <section id="vacunaciones" class="module">
+        <div class="module-head">
+          <button class="back-button" data-module="inicio" aria-label="Volver al inicio">&larr; Inicio</button>
+          <h2>Vacunaciones</h2>
+        </div>
+        <section class="panel search-panel">
+          <label class="search-big">
+            <span>Buscar colaborador</span>
+            <input id="searchInput" type="search" placeholder="Nombre o c&oacute;digo..." autocomplete="off" />
+          </label>
+          <button class="ghost-button" id="resetFilters">Limpiar</button>
+        </section>
 
-      <section class="module-tabs">
-        <button class="module-tab active" data-module="vacunaciones">Vacunaciones</button>
-        <button class="module-tab" data-module="fenix">Resultados FENIX</button>
-        <button class="module-tab" data-module="programas">Programas futuros</button>
-        <button class="module-tab" data-module="respaldos">Respaldos</button>
-      </section>
-
-      <section id="vacunaciones" class="module active">
-        <section class="panel">
+        <section class="panel hepb-panel" id="hepbPanel" hidden>
           <div class="panel-header">
             <div>
-              <h3>Filtros de vacunación</h3>
-              <p>Filtra por año, vacuna, estado, gerencia o busca por código, nombre, área o tipo. El resumen se recalcula contra el Head Count actual cargado.</p>
+              <h3>Hepatitis B: dosis por persona</h3>
+              <p>Cu&aacute;ntas dosis lleva y cu&aacute;ndo se aplic&oacute; cada una (esquema de 3 dosis).</p>
             </div>
-            <button class="ghost-button" id="resetFilters">Limpiar filtros</button>
           </div>
-          <div class="filters">
-            <label>Año<select id="yearFilter"></select></label>
-            <label>Vacuna<select id="vaccineFilter"></select></label>
-            <label>Estado<select id="statusFilter"></select></label>
-            <label>Gerencia<select id="managementFilter"></select></label>
-            <label class="search-label">Buscar<input id="searchInput" type="search" placeholder="C&oacute;digo, nombre, &aacute;rea, tipo..." /></label>
+          <div class="hepb-list" id="hepbList"></div>
+        </section>
+
+
+        <section class="panel section-index">
+          <div class="section-buttons">
+            <button class="section-button" data-detail="indicatorsSection"><i class="sec-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5"/><path d="M4 19h16"/><path d="m7 14 4-4 3 3 5-6"/></svg></i><b>Indicadores</b><span>Head Count, cobertura y pendientes</span></button>
+            <button class="section-button" data-detail="uploadSection"><i class="sec-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17.5a4 4 0 0 1-.6-8 5.5 5.5 0 0 1 10.7-1A4.2 4.2 0 0 1 17 17.5"/><path d="M12 12v8"/><path d="m9 15 3-3 3 3"/></svg></i><b>Cargar datos</b><span>Carpeta SISO, Head Count y jornadas</span></button>
+            <button class="section-button" data-detail="filtersSection"><i class="sec-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6 7.5V19l-4 1.5v-8z"/></svg></i><b>Filtros</b><span>A&ntilde;o, vacuna, estado y gerencia</span></button>
+            <button class="section-button" data-detail="summarySection"><i class="sec-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9h-9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/></svg></i><b>Resumen ejecutivo</b><span>Cobertura frente al Head Count</span></button>
+            <button class="section-button" data-detail="comparisonSection"><i class="sec-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M3 20h18"/></svg></i><b>Comparativo</b><span>Vacunados y pendientes por vacuna y a&ntilde;o</span></button>
+            <button class="section-button" data-detail="recordsSection"><i class="sec-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7"/><path d="M18 14c2 .7 3 2.7 3 6"/></svg></i><b>Personas y jornadas</b><span>Listado con dosis y fechas</span></button>
+            <button class="section-button" data-detail="matrixSection"><i class="sec-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="2"/><path d="M3.5 9.5h17M3.5 15h17M9.5 3.5v17M15 3.5v17"/></svg></i><b>Matriz por colaborador</b><span>Estado de cada persona por vacuna</span></button>
+            <button class="section-button" data-detail="vaccineCoverageSection"><i class="sec-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10"/><path d="M4 12h16"/><path d="M4 18h7"/></svg></i><b>Cobertura por vacuna</b><span>Registros por vacuna</span></button>
+            <button class="section-button" data-detail="statusSection"><i class="sec-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg></i><b>Estados</b><span>Distribuci&oacute;n por estado</span></button>
+            <button class="section-button" data-detail="sourcesSection"><i class="sec-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></i><b>Fuentes</b><span>Jornadas incluidas</span></button>
+            <button class="section-button" data-detail="excludedSection"><i class="sec-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></i><b>Pendiente de validar</b><span>No entra a indicadores</span></button>
+          </div>
+        </section>
+
+        <section class="panel detail-panel" id="indicatorsSection">
+          <div class="panel-header">
+            <div>
+              <h3>Indicadores</h3>
+              <p>Resumen seg&uacute;n los filtros actuales frente al Head Count.</p>
+            </div>
+          </div>
+          <div class="kpi-grid" id="kpiGrid"></div>
+        </section>
+
+        <section class="panel detail-panel" id="uploadSection">
+          <div class="panel-header">
+            <div>
+              <h3>Cargar datos</h3>
+              <p>Lo m&aacute;s sencillo: selecciona la carpeta RESPALDO DE SISO (en computadora, con Edge o Chrome).</p>
+            </div>
+          </div>
+          <div class="headcount-tools">
+            <div>
+              <strong>Carpeta SISO en OneDrive</strong>
+              <span id="folderImportInfo">Selecciona la carpeta RESPALDO DE SISO para cargar CSV guardados.</span>
+            </div>
+            <button class="primary-button" id="loadSisoFolder">Seleccionar carpeta SISO</button>
+            <label class="file-button">
+              Convertir Excel a CSV
+              <input id="excelConvertUpload" type="file" accept=".xlsx,.xls" />
+            </label>
           </div>
           <div class="headcount-tools">
             <div>
@@ -115,32 +191,24 @@
             <button class="ghost-button" id="downloadVaccineTemplate">Plantilla CSV</button>
             <button class="ghost-button" id="clearVaccineData">Borrar jornadas cargadas</button>
           </div>
-          <div class="headcount-tools">
-            <div>
-              <strong>Carpeta SISO en OneDrive</strong>
-              <span id="folderImportInfo">Selecciona la carpeta RESPALDO DE SISO para cargar CSV guardados.</span>
-            </div>
-            <button class="primary-button" id="loadSisoFolder">Seleccionar carpeta SISO</button>
-            <label class="file-button">
-              Convertir Excel a CSV
-              <input id="excelConvertUpload" type="file" accept=".xlsx,.xls" />
-            </label>
-          </div>
         </section>
 
-        <section class="panel hepb-panel" id="hepbPanel" hidden>
+        <section class="panel detail-panel" id="filtersSection">
           <div class="panel-header">
             <div>
-              <h3>Hepatitis B: dosis por persona</h3>
-              <p>Cu&aacute;ntas dosis lleva y cu&aacute;ndo se aplic&oacute; cada una (esquema de 3 dosis).</p>
+              <h3>Filtros</h3>
+              <p>El resumen y las tablas se recalculan contra el Head Count actual.</p>
             </div>
           </div>
-          <div class="hepb-list" id="hepbList"></div>
+          <div class="filters">
+            <label>A&ntilde;o<select id="yearFilter"></select></label>
+            <label>Vacuna<select id="vaccineFilter"></select></label>
+            <label>Estado<select id="statusFilter"></select></label>
+            <label>Gerencia<select id="managementFilter"></select></label>
+          </div>
         </section>
 
-        <section class="kpi-grid" id="kpiGrid"></section>
-
-        <section class="panel summary-panel">
+        <section class="panel summary-panel detail-panel" id="summarySection">
           <div class="panel-header">
             <div>
               <h3>Resumen ejecutivo seg&uacute;n filtros</h3>
@@ -161,24 +229,6 @@
             <article class="summary-chart">
               <div class="status-list compact-list" id="summaryStatusList"></div>
             </article>
-          </div>
-        </section>
-
-        <section class="panel section-index">
-          <div class="panel-header">
-            <div>
-              <h3>Secciones de detalle</h3>
-              <p>Abre solo la vista que necesitas revisar o exportar.</p>
-            </div>
-          </div>
-          <div class="section-buttons">
-            <button class="section-button" data-detail="comparisonSection">Comparativo contra Head Count actual</button>
-            <button class="section-button" data-detail="vaccineCoverageSection">Cobertura por vacuna</button>
-            <button class="section-button" data-detail="statusSection">Estados actuales</button>
-            <button class="section-button" data-detail="recordsSection">Personas y jornadas</button>
-            <button class="section-button" data-detail="matrixSection">Matriz por colaborador</button>
-            <button class="section-button" data-detail="sourcesSection">Fuentes incluidas</button>
-            <button class="section-button" data-detail="excludedSection">Pendiente de validar</button>
           </div>
         </section>
 
@@ -208,7 +258,6 @@
           </div>
         </section>
 
-        <section class="split detail-split">
           <article class="panel detail-panel" id="vaccineCoverageSection">
             <div class="panel-header">
               <div>
@@ -227,7 +276,6 @@
             </div>
             <div class="status-list" id="statusList"></div>
           </article>
-        </section>
 
         <section class="panel detail-panel" id="recordsSection">
           <div class="panel-header">
@@ -281,7 +329,6 @@
           </div>
         </section>
 
-        <section class="split detail-split">
           <article class="panel detail-panel" id="sourcesSection">
             <div class="panel-header">
               <div>
@@ -302,10 +349,13 @@
             </div>
             <div id="excludedList" class="source-list warning"></div>
           </article>
-        </section>
       </section>
 
       <section id="fenix" class="module">
+        <div class="module-head">
+          <button class="back-button" data-module="inicio" aria-label="Volver al inicio">&larr; Inicio</button>
+          <h2>Resultados FENIX</h2>
+        </div>
         <section class="panel">
           <div class="panel-header">
             <div>
@@ -350,6 +400,10 @@
       </section>
 
       <section id="programas" class="module">
+        <div class="module-head">
+          <button class="back-button" data-module="inicio" aria-label="Volver al inicio">&larr; Inicio</button>
+          <h2>Programas</h2>
+        </div>
         <section class="panel">
           <div class="panel-header">
             <div>
@@ -367,6 +421,10 @@
       </section>
 
       <section id="respaldos" class="module">
+        <div class="module-head">
+          <button class="back-button" data-module="inicio" aria-label="Volver al inicio">&larr; Inicio</button>
+          <h2>Respaldos</h2>
+        </div>
         <section class="panel">
           <div class="panel-header">
             <div>
@@ -386,6 +444,6 @@
       </section>
     </main>
 
-    <script src="./app.js?v=siso-20261023-carpetas"></script>
+    <script src="./app.js?v=siso-20261024-diseno"></script>
   </body>
 </html>
