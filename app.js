@@ -335,7 +335,6 @@ const MODULE_TITLES = {
   inicio: "Inicio",
   vacunaciones: "Vacunaciones",
   fenix: "Resultados FENIX",
-  programas: "Programas",
   respaldos: "Respaldos",
 };
 
