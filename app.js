@@ -47,6 +47,9 @@ const users = [
   { username: "ENFERMERIA2IAK", label: "Enfermeria 2 IAK", photo: false, salt: "f99964f7845d77c2f2e3abe4cf8133ec", hash: "8c3d5bf53b18a00ac242d7c7b3d0b8eb728bd506cc21149a09673fee3b6fe770" },
   { username: "ENFERMERIA3IAK", label: "Enfermeria 3 IAK", photo: false, salt: "769ea573f8825af133d649d88e7a5e55", hash: "bd82360ae6f2a9a84a20cc514ffab11615cd5f5a2392c73e4304f9f64a110e4a" },
   { username: "ODONTOLOGIAIAK", label: "Odontologia IAK", photo: false, salt: "7a2c44b19b6e02bcbe69b927f0008336", hash: "ed362dcfa0aa44b77a8d9284384b797ce8de25e97e6454a649f0037735f50307" },
+  { username: "ENFERMERIACUBREIAK", label: "Enfermeria Cubre IAK", photo: false, salt: "9d901ab8029124073a4af0b150f8cf15", hash: "8f2a4ea6736bcfae8ac837d90aac9961a3386aeded4753b9b9bc71e8bd53070e" },
+  { username: "CLINICAMEDICACUBREIAK", label: "Clinica Medica Cubre IAK", photo: false, salt: "3d37c4f16a5050d0706357b497bf0b95", hash: "9158a8ff9dbaccc3707e78336f3ff447dfe073b51516f2b27fd02a04e835ae5e" },
+  { username: "ODONTOLOGIACUBREIAK", label: "Odontologia Cubre IAK", photo: false, salt: "3323464df6a1bec5be58c22d90c635ca", hash: "ecbb1c56dda68a279bfbb4291f6425ab82608b515cdcdef07eadb9a615a031bd" },
 ];
 
 function hexToBytes(hex) {
