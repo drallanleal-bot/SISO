@@ -208,14 +208,37 @@ function recordWhen(record) {
   return record.fecha ? formatDate(record.fecha) : String(record.anio || "Sin fecha");
 }
 
+// Un codigo solo identifica a la persona si tiene numeros (ej. 16631).
+// Textos como "CLINICA" o "S/C" no son codigos: en ese caso se usa el nombre.
 function personKey(record) {
-  const code = normalizeText(record.codigo);
-  if (code && code !== "s/c") return `c:${code}`;
+  const code = normalizeText(record.codigo).replace(/\s+/g, "");
+  if (/\d/.test(code)) return `c:${code.replace(/^0+/, "")}`;
   return `n:${normalizeText(record.nombre || record.nombre_listado).replace(/\s+/g, " ")}`;
 }
 
+// Reconoce Hepatitis B aunque el nombre traiga la dosis u otra forma de escribirla:
+// "Hepatitis B", "HEPATITIS B 2DA DOSIS", "Hep B", "VHB", "Hepatitis tipo B"...
 function isHepB(record) {
-  return normalizeText(record.vacuna).replace(/\s+/g, " ") === "hepatitis b";
+  const name = normalizeText(record.vacuna).replace(/[^a-z0-9]+/g, " ").trim();
+  if (/\bhepatitis a\b|\bvha\b|\bhep a\b/.test(name)) return false;
+  return /\bhepatitis (tipo )?b\b|\bhep b\b|\bvhb\b|\bhbv\b|\bengerix\b/.test(name);
+}
+
+// Numero de dosis escrito en el nombre de la vacuna: "2da dosis", "dosis 3", "3°", "refuerzo"...
+function doseFromText(text) {
+  const t = normalizeText(text);
+  let m = t.match(/(\d)\s*(?:ra|da|ta|ma|era|er|o|a|°|º|ª)?\s*dosis/);
+  if (m) return Number(m[1]);
+  m = t.match(/dosis\s*(?:no\.?|#|numero)?\s*(\d)/);
+  if (m) return Number(m[1]);
+  if (/\bprimera\b/.test(t)) return 1;
+  if (/\bsegunda\b/.test(t)) return 2;
+  if (/\btercera\b/.test(t)) return 3;
+  return 0;
+}
+
+function recordDose(record) {
+  return Number(record.dosis) || doseFromText(record.vacuna);
 }
 
 function isAppliedDose(record) {
@@ -224,7 +247,7 @@ function isAppliedDose(record) {
 }
 
 function doseSortValue(record) {
-  return `${record.fecha || `${record.anio || 0}-00-00`}|${String(record.dosis || "").padStart(2, "0")}`;
+  return `${record.fecha || `${record.anio || 0}-00-00`}|${String(recordDose(record) || "").padStart(2, "0")}`;
 }
 
 // Historial de dosis de Hepatitis B por persona (codigo o, si no tiene, nombre).
@@ -242,12 +265,12 @@ function hepBHistories() {
       .slice()
       .sort((a, b) => doseSortValue(a).localeCompare(doseSortValue(b)))
       .filter((r) => {
-        const id = r.fecha ? `f:${r.fecha}` : `s:${normalizeText(r.fuente)}|${r.anio}|${r.dosis || ""}`;
+        const id = r.fecha ? `f:${r.fecha}` : `s:${normalizeText(r.fuente)}|${r.anio}|${recordDose(r) || ""}`;
         if (seen.has(id)) return false;
         seen.add(id);
         return true;
       })
-      .map((r, index) => ({ record: r, numero: Number(r.dosis) || index + 1 }));
+      .map((r, index) => ({ record: r, numero: recordDose(r) || index + 1 }));
     result.set(key, doses);
   });
   return result;
@@ -1173,6 +1196,7 @@ async function loadSisoFolder() {
     let fenixLoaded = 0;
     let newJornadas = 0;
     let headcountModified = -1;
+    let headcountPath = "";
     state.data.records = [];
     state.data.sources = [];
 
@@ -1186,6 +1210,7 @@ async function loadSisoFolder() {
         const headcount = headcountFromCsv(text);
         if (headcount.length) {
           headcountModified = item.file.lastModified;
+          headcountPath = item.path;
           state.data.headcount = headcount;
           state.headcountSource = `Head Count cargado desde carpeta: ${item.path}`;
           localStorage.setItem("siso_headcount_override", JSON.stringify({ source: state.headcountSource, headcount }));
@@ -1234,7 +1259,7 @@ async function loadSisoFolder() {
     $("vaccineUploadInfo").textContent = vaccineLoaded
       ? `${formatNumber(vaccineLoaded)} registros agregados desde ${formatNumber(vaccineFiles)} archivo(s)`
       : $("vaccineUploadInfo").textContent;
-    status.textContent = `Carpeta revisada: ${formatNumber(csvFiles.length)} CSV. ${consolidated ? "Se uso el consolidado final." : "No habia consolidado final, se leyeron CSV separados."}${newJornadas ? ` Jornadas nuevas incorporadas: ${formatNumber(newJornadas)}.` : ""} Head Count: ${headcountLoaded ? formatNumber(headcountLoaded) : "sin cambios"}. Jornadas: ${formatNumber(vaccineLoaded)} registros.`;
+    status.textContent = `Carpeta revisada: ${formatNumber(csvFiles.length)} CSV. ${consolidated ? "Se uso el consolidado final." : "No habia consolidado final, se leyeron CSV separados."}${newJornadas ? ` Jornadas nuevas incorporadas: ${formatNumber(newJornadas)}.` : ""} Head Count: ${headcountLoaded ? `${formatNumber(headcountLoaded)} (${headcountPath})` : "sin cambios"}. Jornadas: ${formatNumber(vaccineLoaded)} registros.`;
     if (fenixLoaded) {
       $("fenixSummary").textContent = `Indice FENIX cargado desde ${fenixIndex.path}: ${formatNumber(fenixLoaded)} resultados PDF disponibles.`;
     }
