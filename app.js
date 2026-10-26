@@ -1407,9 +1407,7 @@ async function loadSisoFolder() {
     hideBusy(true, `Listo: ${formatNumber(state.data.records.length)} registros cargados`);
   } catch (error) {
     if (error.name !== "AbortError") hideBusy(false, "No se pudo cargar la carpeta");
-    status.textContent = error.name === "AbortError"
-      ? "No se selecciono ninguna carpeta."
-      : `No se cargo la carpeta. ${error.message}`;
+    status.textContent = folderErrorMessage(error, "cargo la carpeta");
   } finally {
     button.disabled = false;
     button.textContent = "Seleccionar carpeta SISO";
@@ -1651,6 +1649,30 @@ async function moveToIncorporated(root, items) {
   return moved;
 }
 
+// Usa la carpeta SISO ya elegida en esta sesion; solo pregunta si aun no se eligio o si no hay permiso.
+async function getSisoDirectory() {
+  const current = state.sisoDirectoryHandle;
+  if (current && current.queryPermission) {
+    try {
+      let permission = await current.queryPermission({ mode: "readwrite" });
+      if (permission === "prompt") permission = await current.requestPermission({ mode: "readwrite" });
+      if (permission === "granted") return current;
+    } catch (error) {
+      // Si falla, se vuelve a pedir la carpeta.
+    }
+  }
+  const directory = await window.showDirectoryPicker({ mode: "readwrite" });
+  state.sisoDirectoryHandle = directory;
+  return directory;
+}
+
+// Mensaje claro cuando falla el acceso a la carpeta.
+function folderErrorMessage(error, action) {
+  if (error.name === "AbortError") return `No se eligio ninguna carpeta, por eso no se ${action}. Vuelve a intentarlo y presiona "Seleccionar carpeta" con RESPALDO DE SISO.`;
+  if (error.name === "NotAllowedError") return `El navegador no dio permiso para editar la carpeta, por eso no se ${action}. Vuelve a intentarlo y acepta "Editar archivos".`;
+  return `No se ${action}. ${error.message}`;
+}
+
 // Deja solo los N archivos mas recientes del historial.
 async function pruneHistory(directory, keep) {
   const files = [];
@@ -1681,14 +1703,14 @@ async function backupToFolder() {
     return;
   }
   try {
-    const dir = await window.showDirectoryPicker({ mode: "readwrite" });
+    const dir = await getSisoDirectory();
     const file = await dir.getFileHandle(filename, { create: true });
     const writable = await file.createWritable();
     await writable.write(JSON.stringify(payload, null, 2));
     await writable.close();
     status.textContent = `Respaldo guardado: ${filename}`;
   } catch (error) {
-    status.textContent = `No se guardo en carpeta. ${error.message}`;
+    status.textContent = folderErrorMessage(error, "guardo el respaldo tecnico");
   }
 }
 
@@ -1700,9 +1722,8 @@ async function readableBackupToFolder() {
   }
 
   try {
-    const root = await window.showDirectoryPicker({ mode: "readwrite" });
+    const root = await getSisoDirectory();
     showBusy("Guardando respaldo...");
-    state.sisoDirectoryHandle = root;
     const stamp = backupStamp();
     const vaccinesRoot = await getDirectory(root, "Vacunas");
     await saveConsolidatedIfPossible(root);
@@ -1798,7 +1819,7 @@ async function readableBackupToFolder() {
     hideBusy(true, "Respaldo guardado");
   } catch (error) {
     if (error.name !== "AbortError") hideBusy(false, "No se guardó el respaldo");
-    status.textContent = `No se guardo el respaldo legible. ${error.message}`;
+    status.textContent = folderErrorMessage(error, "guardo el respaldo legible");
   }
 }
 
