@@ -380,6 +380,7 @@ async function mergePeople(fromKey, toKey) {
     `¿Unir "${source.nombre}" con "${target.nombre}" (${target.codigo || "S/C"})?\n\nTodos los registros de vacunas de "${source.nombre}" pasarán a "${target.nombre}". No se borra ninguna vacuna.`,
   );
   if (!ok) return;
+  showBusy("Uniendo registros...");
   let changed = 0;
   state.data.records = state.data.records.map((record) => {
     if (personKey(record) !== fromKey) return record;
@@ -398,6 +399,7 @@ async function mergePeople(fromKey, toKey) {
       ? `Listo: ${changed} registro(s) unidos a ${target.nombre}. Consolidado actualizado en la carpeta SISO.`
       : `Listo: ${changed} registro(s) unidos a ${target.nombre}. Para guardarlo en OneDrive, ve a Cargar datos y selecciona la carpeta SISO.`;
   }
+  hideBusy(true, saved ? "Unido y guardado" : "Unido (falta guardar en carpeta)");
 }
 
 function mergeVaccinationRecords(existing, incoming) {
@@ -436,10 +438,30 @@ function switchModule(moduleName) {
   document.querySelectorAll("[data-module]").forEach((item) => {
     item.classList.toggle("active", item.dataset.module === moduleName);
   });
-  document.body.dataset.module = moduleName;
+  document.body.dataset.currentModule = moduleName;
   if ($("mobileModuleTitle")) $("mobileModuleTitle").textContent = MODULE_TITLES[moduleName] || "SISO";
   if (moduleName === "vacunaciones") closeDetailSection();
   window.scrollTo({ top: 0 });
+}
+
+// Aviso amarillo "Cargando..." mientras SISO trabaja; verde "Listo" al terminar.
+let busyTimer = null;
+function showBusy(text = "Cargando...") {
+  const el = $("busyIndicator");
+  if (!el) return;
+  clearTimeout(busyTimer);
+  el.className = "busy-indicator is-loading";
+  el.querySelector("span").textContent = text;
+  el.hidden = false;
+}
+
+function hideBusy(ok = true, text = ok ? "Listo" : "No se completó") {
+  const el = $("busyIndicator");
+  if (!el) return;
+  el.className = `busy-indicator ${ok ? "is-done" : "is-error"}`;
+  el.querySelector("span").textContent = text;
+  clearTimeout(busyTimer);
+  busyTimer = setTimeout(() => (el.hidden = true), ok ? 3500 : 6000);
 }
 
 function renderHomeStats() {
@@ -1283,6 +1305,7 @@ async function loadSisoFolder() {
   if (button.disabled) return;
   try {
     const directory = await window.showDirectoryPicker({ mode: "readwrite" });
+    showBusy("Cargando carpeta SISO...");
     button.disabled = true;
     button.textContent = "Leyendo carpeta...";
     status.textContent = "Leyendo los archivos de la carpeta SISO. Puede tardar unos segundos si OneDrive esta descargandolos...";
@@ -1381,7 +1404,9 @@ async function loadSisoFolder() {
     if (fenixLoaded) {
       $("fenixSummary").textContent = `Indice FENIX cargado desde ${fenixIndex.path}: ${formatNumber(fenixLoaded)} resultados PDF disponibles.`;
     }
+    hideBusy(true, `Listo: ${formatNumber(state.data.records.length)} registros cargados`);
   } catch (error) {
+    if (error.name !== "AbortError") hideBusy(false, "No se pudo cargar la carpeta");
     status.textContent = error.name === "AbortError"
       ? "No se selecciono ninguna carpeta."
       : `No se cargo la carpeta. ${error.message}`;
@@ -1676,6 +1701,7 @@ async function readableBackupToFolder() {
 
   try {
     const root = await window.showDirectoryPicker({ mode: "readwrite" });
+    showBusy("Guardando respaldo...");
     state.sisoDirectoryHandle = root;
     const stamp = backupStamp();
     const vaccinesRoot = await getDirectory(root, "Vacunas");
@@ -1769,7 +1795,9 @@ async function readableBackupToFolder() {
     );
 
     status.textContent = `Respaldo legible guardado con fecha ${stamp}. Tambien se actualizo consolidado_final_vacunaciones_siso.csv.`;
+    hideBusy(true, "Respaldo guardado");
   } catch (error) {
+    if (error.name !== "AbortError") hideBusy(false, "No se guardó el respaldo");
     status.textContent = `No se guardo el respaldo legible. ${error.message}`;
   }
 }
@@ -1866,7 +1894,8 @@ async function init() {
   applyFilters();
   renderFenix();
 
-  document.querySelectorAll("[data-module]").forEach((item) => {
+  // Solo botones y enlaces de navegacion (nunca el body ni contenedores).
+  document.querySelectorAll("button[data-module], a[data-module]").forEach((item) => {
     item.addEventListener("click", (event) => {
       event.preventDefault();
       switchModule(item.dataset.module);
