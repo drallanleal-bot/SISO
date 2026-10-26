@@ -1582,3 +1582,38 @@ input {
     display: none;
   }
 }
+
+/* Otras vacunas y unir personas */
+.hepb-others {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.hepb-others b {
+  color: var(--ink);
+}
+
+.merge-row {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.merge-status {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--green-2);
+  color: var(--green);
+  font-weight: 700;
+}
+
+.merge-status[hidden] {
+  display: none;
+}

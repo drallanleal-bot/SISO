@@ -208,6 +208,12 @@ function recordWhen(record) {
   return record.fecha ? formatDate(record.fecha) : String(record.anio || "Sin fecha");
 }
 
+// Codigos sin numeros ("CLINICA", "S/C", "N/A") se guardan como sin codigo.
+function normalizeCode(value) {
+  const text = String(value || "").trim();
+  return /\d/.test(text) ? text : "";
+}
+
 // Un codigo solo identifica a la persona si tiene numeros (ej. 16631).
 // Textos como "CLINICA" o "S/C" no son codigos: en ese caso se usa el nombre.
 function personKey(record) {
@@ -302,6 +308,12 @@ function renderHepBPanel() {
     if (!people.has(key)) people.set(key, p);
   });
   const list = [...people.entries()].slice(0, 30);
+  const recordsByPerson = new Map();
+  state.data.records.forEach((r) => {
+    const key = personKey(r);
+    if (!recordsByPerson.has(key)) recordsByPerson.set(key, []);
+    recordsByPerson.get(key).push(r);
+  });
   panel.hidden = false;
   if (!list.length) {
     $("hepbList").innerHTML = '<p class="hepb-empty">Sin personas que coincidan con la busqueda.</p>';
@@ -330,9 +342,62 @@ function renderHepBPanel() {
             </div>
           </header>
           ${doseItems ? `<ol class="hepb-doses">${doseItems}</ol>` : ""}
+          ${otherVaccinesLine(recordsByPerson.get(key) || [])}
+          ${list.length > 1 && (recordsByPerson.get(key) || []).length
+            ? `<label class="merge-row">Es la misma persona que:
+                <select data-merge-from="${escapeHtml(key)}">
+                  <option value="">Elegir...</option>
+                  ${list
+                    .filter(([otherKey]) => otherKey !== key)
+                    .map(([otherKey, other]) => `<option value="${escapeHtml(otherKey)}">${escapeHtml(other.nombre || "Sin nombre")} (${escapeHtml(other.codigo || "S/C")})</option>`)
+                    .join("")}
+                </select>
+              </label>`
+            : ""}
         </article>`;
     })
     .join("");
+}
+
+function otherVaccinesLine(records) {
+  const others = [...new Set(records.filter((r) => !isHepB(r)).map((r) => `${r.vacuna} ${r.anio || ""}`.trim()))];
+  if (!others.length) return "";
+  return `<p class="hepb-others"><b>Otras vacunas:</b> ${escapeHtml(others.slice(0, 8).join(", "))}${others.length > 8 ? "..." : ""}</p>`;
+}
+
+function personLabel(key) {
+  const fromRecord = state.data.records.find((r) => personKey(r) === key);
+  const fromHeadcount = state.data.headcount.find((p) => personKey(p) === key);
+  return fromHeadcount || fromRecord || null;
+}
+
+// Une a dos personas: todos los registros de "from" pasan al nombre y codigo de "to".
+async function mergePeople(fromKey, toKey) {
+  const target = personLabel(toKey);
+  const source = personLabel(fromKey);
+  if (!target || !source) return;
+  const ok = window.confirm(
+    `¿Unir "${source.nombre}" con "${target.nombre}" (${target.codigo || "S/C"})?\n\nTodos los registros de vacunas de "${source.nombre}" pasarán a "${target.nombre}". No se borra ninguna vacuna.`,
+  );
+  if (!ok) return;
+  let changed = 0;
+  state.data.records = state.data.records.map((record) => {
+    if (personKey(record) !== fromKey) return record;
+    changed += 1;
+    return { ...record, nombre: target.nombre, codigo: normalizeCode(target.codigo) };
+  });
+  state.data.records = mergeVaccinationRecords([], state.data.records);
+  persistVaccinationData();
+  const saved = await saveConsolidatedIfPossible();
+  populateFilters();
+  applyFilters();
+  const status = $("mergeStatus");
+  if (status) {
+    status.hidden = false;
+    status.textContent = saved
+      ? `Listo: ${changed} registro(s) unidos a ${target.nombre}. Consolidado actualizado en la carpeta SISO.`
+      : `Listo: ${changed} registro(s) unidos a ${target.nombre}. Para guardarlo en OneDrive, ve a Cargar datos y selecciona la carpeta SISO.`;
+  }
 }
 
 function mergeVaccinationRecords(existing, incoming) {
@@ -972,7 +1037,7 @@ function vaccinationRecordsFromCsv(text, fileName) {
       const fecha = dateIndex >= 0 ? normalizeDate(row[dateIndex]) : "";
       const rawDose = doseIndex >= 0 ? String(row[doseIndex] || "").match(/\d+/)?.[0] : "";
       return {
-        codigo: String(row[codeIndex] || "").trim(),
+        codigo: normalizeCode(row[codeIndex]),
         nombre: String(row[nameIndex] || "").trim().toUpperCase(),
         vacuna: String(row[vaccineIndex] || fallbackVaccine).trim(),
         anio: Number(rawYear.match(/20\d{2}/)?.[0] || fecha.slice(0, 4) || fallbackYear),
@@ -1068,7 +1133,7 @@ function loadSavedVaccinations() {
   try {
     const saved = JSON.parse(localStorage.getItem("siso_vaccine_records_override") || "null");
     if (saved && Array.isArray(saved.records)) {
-      state.data.records = saved.records;
+      state.data.records = saved.records.map((record) => ({ ...record, codigo: normalizeCode(record.codigo) }));
       if (Array.isArray(saved.sources)) state.data.sources = saved.sources;
       $("vaccineUploadInfo").textContent = `${formatNumber(saved.records.length)} registros guardados en este equipo`;
     }
@@ -1151,7 +1216,12 @@ const HISTORY_KEEP = 5;
 // Carpetas que SISO no lee al cargar: historial de respaldos y archivo viejo.
 function isIgnoredFolder(name) {
   const normalized = normalizeText(name);
-  return normalized === "historial" || normalized.startsWith("archivo_viejo") || normalized.startsWith("archivo viejo");
+  return (
+    normalized === "historial" ||
+    normalized === "incorporadas" ||
+    normalized.startsWith("archivo_viejo") ||
+    normalized.startsWith("archivo viejo")
+  );
 }
 
 function isNewJornadaPath(path) {
@@ -1197,6 +1267,7 @@ async function loadSisoFolder() {
     let newJornadas = 0;
     let headcountModified = -1;
     let headcountPath = "";
+    const incorporatedFiles = [];
     state.data.records = [];
     state.data.sources = [];
 
@@ -1219,7 +1290,10 @@ async function loadSisoFolder() {
       } else if (!consolidated || item.path === consolidated.path || isNewJornadaPath(item.path)) {
         const records = vaccinationRecordsFromCsv(text, item.path);
         if (records.length) {
-          if (isNewJornadaPath(item.path)) newJornadas += 1;
+          if (isNewJornadaPath(item.path)) {
+            newJornadas += 1;
+            incorporatedFiles.push(item);
+          }
           state.data.records = mergeVaccinationRecords(state.data.records, records);
           state.data.sources.push({
             anio: yearFromFileName(item.path),
@@ -1245,9 +1319,12 @@ async function loadSisoFolder() {
       renderFenix();
     }
 
+    let movedFiles = 0;
     if (vaccineLoaded) {
       persistVaccinationData();
-      await saveConsolidatedIfPossible();
+      const saved = await saveConsolidatedIfPossible();
+      // Ya quedaron dentro del consolidado: se pasan a Jornadas_nuevas/Incorporadas para no leerlas otra vez.
+      if (saved && incorporatedFiles.length) movedFiles = await moveToIncorporated(directory, incorporatedFiles);
     }
 
     populateFilters();
@@ -1259,7 +1336,7 @@ async function loadSisoFolder() {
     $("vaccineUploadInfo").textContent = vaccineLoaded
       ? `${formatNumber(vaccineLoaded)} registros agregados desde ${formatNumber(vaccineFiles)} archivo(s)`
       : $("vaccineUploadInfo").textContent;
-    status.textContent = `Carpeta revisada: ${formatNumber(csvFiles.length)} CSV. ${consolidated ? "Se uso el consolidado final." : "No habia consolidado final, se leyeron CSV separados."}${newJornadas ? ` Jornadas nuevas incorporadas: ${formatNumber(newJornadas)}.` : ""} Head Count: ${headcountLoaded ? `${formatNumber(headcountLoaded)} (${headcountPath})` : "sin cambios"}. Jornadas: ${formatNumber(vaccineLoaded)} registros.`;
+    status.textContent = `Carpeta revisada: ${formatNumber(csvFiles.length)} CSV. ${consolidated ? "Se uso el consolidado final." : "No habia consolidado final, se leyeron CSV separados."}${newJornadas ? ` Jornadas nuevas incorporadas: ${formatNumber(newJornadas)}${movedFiles ? " (movidas a Jornadas_nuevas/Incorporadas)" : ""}.` : ""} Head Count: ${headcountLoaded ? `${formatNumber(headcountLoaded)} (${headcountPath})` : "sin cambios"}. Jornadas: ${formatNumber(vaccineLoaded)} registros.`;
     if (fenixLoaded) {
       $("fenixSummary").textContent = `Indice FENIX cargado desde ${fenixIndex.path}: ${formatNumber(fenixLoaded)} resultados PDF disponibles.`;
     }
@@ -1482,6 +1559,25 @@ async function writeTextFile(directory, filename, content, type = "text/plain;ch
   const writable = await file.createWritable();
   await writable.write(new Blob([content], { type }));
   await writable.close();
+}
+
+async function moveToIncorporated(root, items) {
+  let moved = 0;
+  try {
+    const newDir = await getDirectory(root, NEW_JORNADAS_FOLDER);
+    const doneDir = await getDirectory(newDir, "Incorporadas");
+    for (const item of items) {
+      const name = item.path.split("/").pop();
+      const parts = item.path.split("/");
+      if (parts.length !== 2) continue; // solo archivos directos de Jornadas_nuevas
+      await writeTextFile(doneDir, name, await item.file.text(), "text/csv;charset=utf-8");
+      await newDir.removeEntry(name);
+      moved += 1;
+    }
+  } catch (error) {
+    console.warn("No se pudieron mover jornadas incorporadas.", error);
+  }
+  return moved;
 }
 
 // Deja solo los N archivos mas recientes del historial.
@@ -1733,6 +1829,13 @@ async function init() {
 
   initDetailSections();
   $("mobileLogout").addEventListener("click", () => $("logoutButton").click());
+  $("hepbList").addEventListener("change", (event) => {
+    const select = event.target.closest("[data-merge-from]");
+    if (!select || !select.value) return;
+    const target = select.value;
+    select.value = "";
+    mergePeople(select.dataset.mergeFrom, target);
+  });
 
   ["yearFilter", "vaccineFilter", "statusFilter", "managementFilter", "searchInput"].forEach((id) => {
     $(id).addEventListener("input", applyFilters);

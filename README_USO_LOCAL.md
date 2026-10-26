@@ -37,7 +37,11 @@ Si existe `consolidado_final_vacunaciones_siso.csv`, SISO usara ese archivo como
 
 1. Guarda el CSV de la jornada dentro de `RESPALDO DE SISO/Jornadas_nuevas` (SISO crea esa carpeta la primera vez que seleccionas la carpeta SISO).
 2. Abre SISO y presiona `Seleccionar carpeta SISO`.
-3. SISO agrega la jornada al consolidado maestro sin duplicar registros, aunque la vuelvas a cargar.
+3. SISO agrega la jornada al consolidado maestro sin duplicar registros y la mueve a `Jornadas_nuevas/Incorporadas` para no leerla otra vez.
+
+## Personas repetidas
+
+Codigos sin numeros (por ejemplo `CLINICA`) se guardan como sin codigo (S/C). Si una persona aparece dos veces en la busqueda (por ejemplo con el nombre escrito distinto), usa `Es la misma persona que:` en su tarjeta: todos sus registros pasan al nombre elegido y no se borra ninguna vacuna.
 
 Si hay varios Head Count en la carpeta, SISO usa el modificado mas recientemente.
 
