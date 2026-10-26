@@ -1703,3 +1703,58 @@ button:disabled {
     transform: rotate(360deg);
   }
 }
+
+/* Ficha del colaborador: laboratorios FENIX */
+.person-labs {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.person-labs > b {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--tile-lab);
+}
+
+.person-labs ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.person-labs li {
+  display: grid;
+  grid-template-columns: 48px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: #eef4ff;
+}
+
+.lab-year {
+  font-weight: 800;
+  color: var(--tile-lab);
+}
+
+.lab-file {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+}
+
+.lab-open {
+  min-height: 36px;
+  padding: 0 12px;
+  background: var(--tile-lab);
+  color: #fff;
+  font-size: 13px;
+}
+
+.muted-line {
+  color: var(--muted);
+}

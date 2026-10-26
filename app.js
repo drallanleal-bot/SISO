@@ -289,6 +289,56 @@ function hepBDoseFor(record, histories) {
   return found ? `${found.numero}ª` : "";
 }
 
+// ---------- Laboratorios FENIX por persona ----------
+const NAME_STOPWORDS = new Set(["de", "del", "la", "las", "los", "y", "vda", "viuda"]);
+
+function nameTokens(name) {
+  return new Set(
+    normalizeText(name)
+      .replace(/[^a-z\s]/g, " ")
+      .split(/\s+/)
+      .filter((word) => word.length > 1 && !NAME_STOPWORDS.has(word)),
+  );
+}
+
+// Misma persona si coincide el codigo (numerico) o si comparten casi todos los nombres,
+// sin importar el orden (FENIX suele traer apellidos primero).
+function samePerson(a, b) {
+  const codeA = normalizeCode(a.codigo).replace(/^0+/, "");
+  const codeB = normalizeCode(b.codigo).replace(/^0+/, "");
+  if (codeA && codeB) return codeA === codeB;
+  const ta = nameTokens(a.nombre || a.nombre_listado);
+  const tb = nameTokens(b.nombre || b.nombre_listado);
+  if (!ta.size || !tb.size) return false;
+  let shared = 0;
+  ta.forEach((word) => {
+    if (tb.has(word)) shared += 1;
+  });
+  const smaller = Math.min(ta.size, tb.size);
+  return shared >= 2 && shared >= Math.min(3, smaller);
+}
+
+function fenixFor(person) {
+  return state.fenixRecords
+    .filter((f) => samePerson(person, f))
+    .sort((a, b) => String(b.anio).localeCompare(String(a.anio)));
+}
+
+function fenixLabsBlock(labs) {
+  if (!state.fenixRecords.length) {
+    return `<div class="person-labs"><b>Laboratorios FENIX</b><p class="muted-line">Carga la carpeta SISO para ver laboratorios.</p></div>`;
+  }
+  if (!labs.length) {
+    return `<div class="person-labs"><b>Laboratorios FENIX</b><p class="muted-line">Sin resultados FENIX encontrados.</p></div>`;
+  }
+  return `<div class="person-labs"><b>Laboratorios FENIX (${labs.length})</b><ul>${labs
+    .slice(0, 10)
+    .map(
+      (f) => `<li><span class="lab-year">${escapeHtml(f.anio || "")}</span><span class="lab-file">${escapeHtml(f.tipo_documento && f.tipo_documento !== "Resultado FENIX" ? f.tipo_documento : f.archivo)}</span><button class="ghost-button lab-open" data-open-fenix="${f.id}">Ver PDF</button></li>`,
+    )
+    .join("")}</ul></div>`;
+}
+
 function renderHepBPanel() {
   const panel = $("hepbPanel");
   if (!panel) return;
@@ -307,6 +357,13 @@ function renderHepBPanel() {
     const key = personKey(p);
     if (!people.has(key)) people.set(key, p);
   });
+  // Personas que solo tienen laboratorios FENIX (sin vacunas registradas).
+  state.fenixRecords
+    .filter((f) => [f.nombre, f.codigo, f.dpi].join(" ").toLowerCase().includes(query))
+    .forEach((f) => {
+      const already = [...people.values()].some((person) => samePerson(person, f));
+      if (!already) people.set(`f:${personKey(f)}`, { nombre: f.nombre, codigo: normalizeCode(f.codigo), soloFenix: true });
+    });
   const list = [...people.entries()].slice(0, 30);
   const recordsByPerson = new Map();
   state.data.records.forEach((r) => {
@@ -343,12 +400,13 @@ function renderHepBPanel() {
           </header>
           ${doseItems ? `<ol class="hepb-doses">${doseItems}</ol>` : ""}
           ${otherVaccinesLine(recordsByPerson.get(key) || [])}
-          ${list.length > 1 && (recordsByPerson.get(key) || []).length
+          ${fenixLabsBlock(fenixFor(person))}
+          ${list.some(([otherKey]) => otherKey !== key && !otherKey.startsWith("f:")) && (recordsByPerson.get(key) || []).length
             ? `<label class="merge-row">Es la misma persona que:
                 <select data-merge-from="${escapeHtml(key)}">
                   <option value="">Elegir...</option>
                   ${list
-                    .filter(([otherKey]) => otherKey !== key)
+                    .filter(([otherKey]) => otherKey !== key && !otherKey.startsWith("f:"))
                     .map(([otherKey, other]) => `<option value="${escapeHtml(otherKey)}">${escapeHtml(other.nombre || "Sin nombre")} (${escapeHtml(other.codigo || "S/C")})</option>`)
                     .join("")}
                 </select>
@@ -1960,6 +2018,10 @@ async function init() {
   $("loadFenixFolder").addEventListener("click", loadSisoFolder);
   ["fenixYearFilter", "fenixSearchInput"].forEach((id) => {
     $(id).addEventListener("input", applyFenixFilters);
+  });
+  $("hepbList").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-open-fenix]");
+    if (button) openFenixPdf(button.dataset.openFenix);
   });
   $("fenixTableBody").addEventListener("click", (event) => {
     const button = event.target.closest("[data-open-fenix]");
