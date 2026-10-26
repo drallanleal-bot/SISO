@@ -43,7 +43,7 @@ Si existe `consolidado_final_vacunaciones_siso.csv`, SISO usara ese archivo como
 
 Codigos sin numeros (por ejemplo `CLINICA`) se guardan como sin codigo (S/C). Si una persona aparece dos veces en la busqueda (por ejemplo con el nombre escrito distinto), usa `Es la misma persona que:` en su tarjeta: todos sus registros pasan al nombre elegido y no se borra ninguna vacuna.
 
-Si hay varios Head Count en la carpeta, SISO usa el modificado mas recientemente.
+Si hay varios Head Count en la carpeta, SISO prefiere los archivos con "Head Count" en el nombre (fuera de la carpeta `Control`) y toma el mes/año mas reciente del nombre, por ejemplo `Head_Count_Agosto_2026_para_SISO.csv`. El mensaje de la carpeta dice que archivo uso.
 
 Las carpetas `Vacunas/Historial` y cualquier carpeta que empiece con `Archivo_viejo` no se leen al cargar: sirven para guardar copias antiguas sin que afecten los datos.
 

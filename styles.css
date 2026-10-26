@@ -1617,3 +1617,18 @@ input {
 .merge-status[hidden] {
   display: none;
 }
+
+/* Cargar datos: el texto ocupa su propia fila y los botones quedan siempre debajo, en el mismo lugar */
+#uploadSection .headcount-tools > div {
+  flex: 1 1 100%;
+  margin-right: 0;
+}
+
+#uploadSection .headcount-tools span {
+  overflow-wrap: anywhere;
+}
+
+button:disabled {
+  opacity: 0.65;
+  cursor: progress;
+}

@@ -1187,6 +1187,34 @@ function isHeadcountCsv(headers, fileName) {
   );
 }
 
+const MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+
+// Mes y año escritos en el nombre del archivo (ej. Head_Count_Agosto_2026) -> numero comparable.
+function monthKeyFromName(path) {
+  const name = normalizeText(path).replace("setiembre", "septiembre");
+  const year = Number(name.match(/20\d{2}/)?.[0] || 0);
+  const month = MONTHS.findIndex((m) => name.includes(m)) + 1;
+  return year * 13 + month;
+}
+
+// Elige el Head Count correcto: primero archivos con "Head Count" en el nombre y fuera de Control,
+// luego el mes/año mas reciente del nombre y por ultimo la fecha de modificacion.
+function headcountRank(item) {
+  const path = normalizeText(item.path).replaceAll("\\", "/");
+  const fileName = path.split("/").pop();
+  const named = /head[\s_-]*count|headcount/.test(fileName) ? 1 : 0;
+  const notControl = path.startsWith("control/") || path.includes("/control/") ? 0 : 1;
+  const inHeadcountFolder = path.startsWith("head_count/") ? 1 : 0;
+  return [named, notControl, inHeadcountFolder, monthKeyFromName(fileName), item.file.lastModified];
+}
+
+function compareRank(a, b) {
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return a[i] - b[i];
+  }
+  return 0;
+}
+
 function isConsolidatedVaccinationCsv(fileName) {
   const normalized = normalizeText(fileName);
   return normalized.includes("consolidado") && (normalized.includes("final") || normalized.includes("jornadas")) && normalized.includes("vacun");
@@ -1251,8 +1279,13 @@ async function loadSisoFolder() {
     return;
   }
 
+  const button = $("loadSisoFolder");
+  if (button.disabled) return;
   try {
     const directory = await window.showDirectoryPicker({ mode: "readwrite" });
+    button.disabled = true;
+    button.textContent = "Leyendo carpeta...";
+    status.textContent = "Leyendo los archivos de la carpeta SISO. Puede tardar unos segundos si OneDrive esta descargandolos...";
     state.sisoDirectoryHandle = directory;
     await getDirectory(directory, NEW_JORNADAS_FOLDER);
     const csvFiles = await collectCsvFiles(directory);
@@ -1265,6 +1298,14 @@ async function loadSisoFolder() {
     let vaccineFiles = 0;
     let fenixLoaded = 0;
     let newJornadas = 0;
+    let bestHeadcount = null;
+    for (const item of csvFiles) {
+      if (isNewJornadaPath(item.path) || isConsolidatedVaccinationCsv(item.path) || isFenixIndexCsv(item.path)) continue;
+      const firstLine = (await item.file.slice(0, 4096).text()).split(/\r?\n/)[0] || "";
+      const headers = parseCsv(firstLine)[0] || [];
+      if (!isHeadcountCsv(headers, item.path)) continue;
+      if (!bestHeadcount || compareRank(headcountRank(item), headcountRank(bestHeadcount)) > 0) bestHeadcount = item;
+    }
     let headcountModified = -1;
     let headcountPath = "";
     const incorporatedFiles = [];
@@ -1276,8 +1317,8 @@ async function loadSisoFolder() {
       const rows = parseCsv(text);
       if (!rows.length) continue;
       if (!isNewJornadaPath(item.path) && isHeadcountCsv(rows[0], item.path)) {
-        // Si hay varios Head Count, se usa el modificado mas recientemente.
-        if (item.file.lastModified < headcountModified) continue;
+        // Solo se usa el Head Count elegido (ver headcountRank); los demas se ignoran.
+        if (!bestHeadcount || item.path !== bestHeadcount.path) continue;
         const headcount = headcountFromCsv(text);
         if (headcount.length) {
           headcountModified = item.file.lastModified;
@@ -1341,7 +1382,12 @@ async function loadSisoFolder() {
       $("fenixSummary").textContent = `Indice FENIX cargado desde ${fenixIndex.path}: ${formatNumber(fenixLoaded)} resultados PDF disponibles.`;
     }
   } catch (error) {
-    status.textContent = `No se cargo la carpeta. ${error.message}`;
+    status.textContent = error.name === "AbortError"
+      ? "No se selecciono ninguna carpeta."
+      : `No se cargo la carpeta. ${error.message}`;
+  } finally {
+    button.disabled = false;
+    button.textContent = "Seleccionar carpeta SISO";
   }
 }
 
