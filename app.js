@@ -290,7 +290,7 @@ function hepBDoseFor(record, histories) {
 }
 
 // ---------- Laboratorios FENIX por persona ----------
-const NAME_STOPWORDS = new Set(["de", "del", "la", "las", "los", "y", "vda", "viuda"]);
+const NAME_STOPWORDS = new Set(["de", "del", "la", "las", "los", "y", "vda", "viuda", "dr", "dra", "lic", "licda", "ing", "sr", "sra"]);
 
 function nameTokens(name) {
   return new Set(
@@ -1322,6 +1322,10 @@ function consolidatedPriority(item) {
   return 9;
 }
 
+function isFenixPath(path) {
+  return normalizeText(path).replaceAll("\\", "/").startsWith("fenix/");
+}
+
 function isFenixIndexCsv(path) {
   const normalized = normalizeText(path).replaceAll("\\", "/");
   return normalized.endsWith("fenix/fenix_indice_resultados_siso.csv") || normalized.endsWith("fenix_indice_resultados_siso.csv");
@@ -1391,7 +1395,7 @@ async function loadSisoFolder() {
     let newJornadas = 0;
     let bestHeadcount = null;
     for (const item of csvFiles) {
-      if (isNewJornadaPath(item.path) || isConsolidatedVaccinationCsv(item.path) || isFenixIndexCsv(item.path)) continue;
+      if (isFenixPath(item.path) || isNewJornadaPath(item.path) || isConsolidatedVaccinationCsv(item.path) || isFenixIndexCsv(item.path)) continue;
       const firstLine = (await item.file.slice(0, 4096).text()).split(/\r?\n/)[0] || "";
       const headers = parseCsv(firstLine)[0] || [];
       if (!isHeadcountCsv(headers, item.path)) continue;
@@ -1404,6 +1408,8 @@ async function loadSisoFolder() {
     state.data.sources = [];
 
     for (const item of csvFiles) {
+      // Los CSV dentro de FENIX (indice, programa 2025, comparativo) no son vacunas ni Head Count.
+      if (isFenixPath(item.path)) continue;
       const text = await item.file.text();
       const rows = parseCsv(text);
       if (!rows.length) continue;
@@ -1472,6 +1478,7 @@ async function loadSisoFolder() {
     if (fenixLoaded) {
       $("fenixSummary").textContent = `Indice FENIX cargado desde ${fenixIndex.path}: ${formatNumber(fenixLoaded)} resultados PDF disponibles.`;
     }
+    if (typeof window.onSisoFolderLoaded === "function") await window.onSisoFolderLoaded(csvFiles, directory);
     hideBusy(true, `Listo: ${formatNumber(state.data.records.length)} registros cargados`);
   } catch (error) {
     if (error.name !== "AbortError") hideBusy(false, "No se pudo cargar la carpeta");

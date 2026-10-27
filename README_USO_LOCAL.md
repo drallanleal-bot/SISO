@@ -134,3 +134,12 @@ Ese consolidado es el archivo maestro para recuperar todas las jornadas actuales
 Las contrasenas no se guardan escritas en `app.js`; solo se guarda una huella cifrada (PBKDF2-SHA256) de la que no se puede recuperar la contrasena.
 
 Para cambiar o agregar un usuario, pidele a Claude que genere la huella nueva y la actualice en `app.js`. Las contrasenas se comunican a cada usuario de forma personal, nunca por GitHub.
+
+## Ganadores del Programa FENIX (2025 vs 2026)
+
+En Clinica Ocupacional -> Resultados FENIX -> "Ganadores del Programa FENIX":
+
+1. Guarda en `RESPALDO DE SISO/FENIX/Programa_2025` los archivos `FENIX_2025_antropometria.csv` y `FENIX_2025_signos_vitales.csv`.
+2. Carga la carpeta SISO y presiona `Leer laboratorios de los PDF`. SISO lee con OCR, en la computadora, los PDF de quienes tienen FENIX 2025 y 2026 (requiere internet solo para descargar el lector la primera vez).
+3. Se muestra el Top 15 por laboratorio. Anota peso, % de grasa y presion 2026 de esas personas y el Top 5 final se calcula solo.
+4. Lo leido y las medidas se guardan en `FENIX/Comparativo`, asi no se vuelve a leer lo mismo.

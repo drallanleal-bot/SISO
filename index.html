@@ -11,7 +11,7 @@
     <link rel="apple-touch-icon" href="icons/apple-touch-icon-kerns.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="SISO" />
-    <link rel="stylesheet" href="./styles.css?v=siso-20261026-clinicas" />
+    <link rel="stylesheet" href="./styles.css?v=siso-20261027-fenix" />
   </head>
   <body class="auth-locked">
     <section class="login-screen" id="loginScreen">
@@ -471,6 +471,45 @@
             </table>
           </div>
         </section>
+
+        <section class="panel cmp-panel" id="fenixCompare">
+          <div class="panel-header">
+            <div>
+              <h3>🏆 Ganadores del Programa FENIX: 2025 vs 2026</h3>
+              <p>Compara los laboratorios de quienes tienen FENIX en ambos a&ntilde;os. Todo se procesa en esta computadora; ning&uacute;n resultado sale de OneDrive.</p>
+            </div>
+          </div>
+          <ol class="cmp-steps">
+            <li>
+              <b>1. Leer laboratorios</b>
+              <span id="cmpParticipants">Primero carga la carpeta SISO (Vacunaciones &rarr; Cargar datos).</span>
+              <div class="cmp-actions">
+                <button class="primary-button" id="cmpRun">📄 Leer laboratorios de los PDF</button>
+                <button class="ghost-button" id="cmpStop" hidden>Detener</button>
+              </div>
+              <div class="cmp-progress" id="cmpProgressWrap" hidden><div class="cmp-progress-bar" id="cmpProgressBar"></div></div>
+              <small id="cmpStatus"></small>
+            </li>
+            <li>
+              <b>2. Top 15 por laboratorio</b>
+              <span>Busca a estas 15 personas en el sistema de expedientes y anota su peso, % de grasa y presi&oacute;n de 2026.</span>
+            </li>
+            <li>
+              <b>3. Top 5 ganadores</b>
+              <span>Al llenar las medidas 2026, el ranking final se calcula solo.</span>
+            </li>
+          </ol>
+          <div id="cmpResults"></div>
+          <details class="cmp-rules">
+            <summary>&iquest;C&oacute;mo se calcula el puntaje?</summary>
+            <ul>
+              <li><b>Laboratorio:</b> % de mejor&iacute;a de colesterol total, LDL, triglic&eacute;ridos y glucosa (que bajen) y HDL (que suba). Cada uno suma m&aacute;ximo 50 puntos.</li>
+              <li><b>Bono:</b> +10 por cada valor que pas&oacute; de alterado a normal; &minus;10 si pas&oacute; de normal a alterado. Normal: colesterol &lt;200, LDL &lt;130, triglic&eacute;ridos &lt;150, HDL &ge;40, glucosa &lt;100.</li>
+              <li><b>Medidas 2026:</b> % de peso perdido &times;2 (m&aacute;x. 25), puntos de % de grasa bajados &times;2 (m&aacute;x. 20) y +10 si la presi&oacute;n pas&oacute; de alta (&ge;130/85) a normal.</li>
+              <li>Participan solo quienes tienen FENIX 2025 y 2026 con al menos 3 valores de l&iacute;pidos/glucosa en ambos a&ntilde;os.</li>
+            </ul>
+          </details>
+        </section>
       </section>
 
       <section id="respaldos" class="module">
@@ -497,6 +536,7 @@
       </section>
     </main>
 
-    <script src="./app.js?v=siso-20261026-clinicas"></script>
+    <script src="./app.js?v=siso-20261027-fenix"></script>
+    <script src="./fenix-comparativo.js?v=siso-20261027-fenix"></script>
   </body>
 </html>
