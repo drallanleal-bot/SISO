@@ -484,9 +484,13 @@ function currentFilters() {
 
 const MODULE_TITLES = {
   inicio: "Inicio",
-  vacunaciones: "Vacunaciones",
-  fenix: "Resultados FENIX",
-  respaldos: "Respaldos",
+  ocupacional: "🦺 Clínica Ocupacional",
+  medica: "🩺 Clínica Médica",
+  odontologia: "🦷 Clínica Odontológica",
+  enfermeria: "👩‍⚕️ Enfermería",
+  vacunaciones: "Clínica Ocupacional · Vacunaciones",
+  fenix: "Clínica Ocupacional · FENIX",
+  respaldos: "Clínica Ocupacional · Respaldos",
 };
 
 function switchModule(moduleName) {
@@ -529,6 +533,12 @@ function renderHomeStats() {
   $("homeVacStat").innerHTML = records || people
     ? `${formatNumber(records)} registros<span class="stat-extra"> · ${formatNumber(people)} en Head Count</span>`
     : "Sin datos cargados";
+  if ($("homeOcuStat")) {
+    const parts = [];
+    if (people) parts.push(`${formatNumber(people)} colaboradores`);
+    if (state.fenixRecords.length) parts.push(`${formatNumber(state.fenixRecords.length)} laboratorios`);
+    $("homeOcuStat").textContent = parts.length ? parts.join(" · ") : "Sin datos cargados";
+  }
   $("homeFenixStat").textContent = state.fenixRecords.length
     ? `${formatNumber(state.fenixRecords.length)} resultados disponibles`
     : "Sin índice cargado";

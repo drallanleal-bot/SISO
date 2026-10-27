@@ -1758,3 +1758,132 @@ button:disabled {
 .muted-line {
   color: var(--muted);
 }
+
+/* ---------- Clínicas con emojis ---------- */
+:root {
+  --tile-ocu: #0f766e;
+  --tile-med: #2563eb;
+  --tile-odo: #0891b2;
+  --tile-enf: #db2777;
+}
+
+.tile-ocu { --accent: var(--tile-ocu); }
+.tile-med { --accent: var(--tile-med); }
+.tile-odo { --accent: var(--tile-odo); }
+.tile-enf { --accent: var(--tile-enf); }
+
+.home-tiles.four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.tile-icon.emoji {
+  background: color-mix(in srgb, var(--accent) 14%, white);
+  border: 3px solid color-mix(in srgb, var(--accent) 45%, white);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--accent) 22%, transparent);
+  font-size: 40px;
+  line-height: 1;
+}
+
+.home-tile:hover .tile-icon.emoji {
+  transform: scale(1.08) rotate(-4deg);
+}
+
+.tile-icon.emoji {
+  transition: transform 0.2s ease;
+}
+
+.tile-stat.soon {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.head-emoji {
+  margin-right: 4px;
+}
+
+/* Espacios en construcción */
+.soon-panel {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 40px 24px;
+  border-top: 5px solid var(--accent);
+}
+
+.soon-emoji {
+  font-size: 54px;
+  line-height: 1;
+}
+
+.soon-panel h3 {
+  font-size: 22px;
+}
+
+.soon-panel p {
+  color: var(--muted);
+  max-width: 560px;
+}
+
+.soon-ideas {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.soon-ideas li {
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 10%, white);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+@media (max-width: 1050px) {
+  .home-tiles.four {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .tile-icon.emoji {
+    font-size: 32px;
+  }
+
+  .home-tiles.four .home-tile:last-child:nth-child(odd) {
+    grid-column: auto;
+  }
+}
+
+/* Diente visible sobre fondo con color */
+.tile-odo .tile-icon.emoji {
+  background: var(--tile-odo);
+  border-color: color-mix(in srgb, var(--tile-odo) 70%, white);
+}
+
+/* En celular también se muestra el botón para regresar (ej. a Clínica Ocupacional) */
+@media (max-width: 640px) {
+  .module-head {
+    flex-wrap: wrap;
+    gap: 8px 12px;
+  }
+
+  .module-head .back-button {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+  }
+
+  #inicio .module-head,
+  #ocupacional .back-button,
+  #medica .back-button,
+  #odontologia .back-button,
+  #enfermeria .back-button {
+    display: none;
+  }
+}

@@ -11,7 +11,7 @@
     <link rel="apple-touch-icon" href="icons/apple-touch-icon-kerns.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="SISO" />
-    <link rel="stylesheet" href="./styles.css?v=siso-20261026-ficha" />
+    <link rel="stylesheet" href="./styles.css?v=siso-20261026-clinicas" />
   </head>
   <body class="auth-locked">
     <section class="login-screen" id="loginScreen">
@@ -44,6 +44,7 @@
       </div>
       <nav class="nav">
         <a href="#inicio" class="active" data-module="inicio">Inicio</a>
+        <a href="#ocupacional" data-module="ocupacional">Cl&iacute;nica Ocupacional</a>
         <a href="#vacunaciones" data-module="vacunaciones">Vacunaciones</a>
         <a href="#fenix" data-module="fenix">Resultados FENIX</a>
         <a href="#respaldos" data-module="respaldos">Respaldos</a>
@@ -75,35 +76,107 @@
         <section class="home-hero">
           <img class="home-logo" src="./assets/company-logo.jpeg" alt="Industrias Alimenticias Kern's" />
           <p class="eyebrow">Sistema Integral de Salud Ocupacional</p>
-          <h2>Hola, <span id="homeUserName">bienvenido</span></h2>
+          <h2>Hola, <span id="homeUserName">bienvenido</span> 👋</h2>
           <p class="home-sub">&iquest;Qu&eacute; quieres revisar hoy?</p>
         </section>
-        <div class="home-tiles">
-          <button class="home-tile tile-vac" data-module="vacunaciones">
-            <span class="tile-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m17 3 4 4"/><path d="m19 5-3.5 3.5"/><path d="M14 6l4 4-8.5 8.5H5.5v-4z"/><path d="m10 10 2 2"/><path d="M5.5 18.5 3 21"/></svg></span>
-            <strong>Vacunaciones</strong>
-            <span class="tile-text">Jornadas, Head Count, dosis de Hepatitis B y coberturas</span>
-            <span class="tile-stat" id="homeVacStat">Sin datos cargados</span>
+        <div class="home-tiles four">
+          <button class="home-tile tile-ocu" data-module="ocupacional">
+            <span class="tile-icon emoji" aria-hidden="true">🦺</span>
+            <strong>Cl&iacute;nica Ocupacional</strong>
+            <span class="tile-text">Vacunaciones, laboratorios FENIX y respaldos</span>
+            <span class="tile-stat" id="homeOcuStat">Sin datos cargados</span>
           </button>
-          <button class="home-tile tile-lab" data-module="fenix">
-            <span class="tile-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6"/><path d="M10 3v6l-5.5 9.5A1.7 1.7 0 0 0 6 21h12a1.7 1.7 0 0 0 1.5-2.5L14 9V3"/><path d="M7.5 15h9"/></svg></span>
-            <strong>Resultados FENIX</strong>
-            <span class="tile-text">Laboratorios de colaboradores en PDF</span>
-            <span class="tile-stat" id="homeFenixStat">Sin &iacute;ndice cargado</span>
+          <button class="home-tile tile-med" data-module="medica">
+            <span class="tile-icon emoji" aria-hidden="true">🩺</span>
+            <strong>Cl&iacute;nica M&eacute;dica</strong>
+            <span class="tile-text">Consultas y procesos de la cl&iacute;nica m&eacute;dica</span>
+            <span class="tile-stat soon">Pr&oacute;ximamente</span>
           </button>
-          <button class="home-tile tile-backup" data-module="respaldos">
-            <span class="tile-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5C4 5.6 7.6 4 12 4s8 1.6 8 3.5-3.6 3.5-8 3.5-8-1.6-8-3.5Z"/><path d="M4 7.5v4.5c0 1.9 3.6 3.5 8 3.5s8-1.6 8-3.5V7.5"/><path d="M4 12v4.5c0 1.9 3.6 3.5 8 3.5s8-1.6 8-3.5V12"/></svg></span>
-            <strong>Respaldos</strong>
-            <span class="tile-text">Guardar copia legible en OneDrive</span>
+          <button class="home-tile tile-odo" data-module="odontologia">
+            <span class="tile-icon emoji" aria-hidden="true">🦷</span>
+            <strong>Cl&iacute;nica Odontol&oacute;gica</strong>
+            <span class="tile-text">Atenciones y procesos de la cl&iacute;nica dental</span>
+            <span class="tile-stat soon">Pr&oacute;ximamente</span>
+          </button>
+          <button class="home-tile tile-enf" data-module="enfermeria">
+            <span class="tile-icon emoji" aria-hidden="true">👩&zwj;⚕️</span>
+            <strong>Enfermer&iacute;a</strong>
+            <span class="tile-text">Procedimientos y registros de enfermer&iacute;a</span>
+            <span class="tile-stat soon">Pr&oacute;ximamente</span>
           </button>
         </div>
         <p class="home-note">Los datos de colaboradores se leen y guardan solo en la carpeta empresarial de OneDrive. <span id="generatedAt"></span></p>
       </section>
 
-      <section id="vacunaciones" class="module">
+      <section id="ocupacional" class="module">
         <div class="module-head">
           <button class="back-button" data-module="inicio" aria-label="Volver al inicio">&larr; Inicio</button>
-          <h2>Vacunaciones</h2>
+          <h2><span class="head-emoji" aria-hidden="true">🦺</span> Cl&iacute;nica Ocupacional</h2>
+        </div>
+        <div class="home-tiles">
+          <button class="home-tile tile-vac" data-module="vacunaciones">
+            <span class="tile-icon emoji" aria-hidden="true">💉</span>
+            <strong>Vacunaciones</strong>
+            <span class="tile-text">Jornadas, Head Count, dosis de Hepatitis B y coberturas</span>
+            <span class="tile-stat" id="homeVacStat">Sin datos cargados</span>
+          </button>
+          <button class="home-tile tile-lab" data-module="fenix">
+            <span class="tile-icon emoji" aria-hidden="true">🧪</span>
+            <strong>Resultados FENIX</strong>
+            <span class="tile-text">Laboratorios de colaboradores en PDF</span>
+            <span class="tile-stat" id="homeFenixStat">Sin &iacute;ndice cargado</span>
+          </button>
+          <button class="home-tile tile-backup" data-module="respaldos">
+            <span class="tile-icon emoji" aria-hidden="true">💾</span>
+            <strong>Respaldos</strong>
+            <span class="tile-text">Guardar copia legible en OneDrive</span>
+          </button>
+        </div>
+      </section>
+
+      <section id="medica" class="module">
+        <div class="module-head">
+          <button class="back-button" data-module="inicio" aria-label="Volver al inicio">&larr; Inicio</button>
+          <h2><span class="head-emoji" aria-hidden="true">🩺</span> Cl&iacute;nica M&eacute;dica</h2>
+        </div>
+        <section class="panel soon-panel" style="--accent: var(--tile-med)">
+          <span class="soon-emoji" aria-hidden="true">🚧</span>
+          <h3>Estamos construyendo este espacio</h3>
+          <p>Aqu&iacute; iremos digitalizando los procesos de la cl&iacute;nica m&eacute;dica. Algunas ideas para empezar:</p>
+          <ul class="soon-ideas"><li>📋 Registro de consultas</li><li>💊 Control de medicamentos</li><li>📈 Pacientes cr&oacute;nicos</li><li>📄 Constancias y referencias</li></ul>
+        </section>
+      </section>
+
+      <section id="odontologia" class="module">
+        <div class="module-head">
+          <button class="back-button" data-module="inicio" aria-label="Volver al inicio">&larr; Inicio</button>
+          <h2><span class="head-emoji" aria-hidden="true">🦷</span> Cl&iacute;nica Odontol&oacute;gica</h2>
+        </div>
+        <section class="panel soon-panel" style="--accent: var(--tile-odo)">
+          <span class="soon-emoji" aria-hidden="true">🚧</span>
+          <h3>Estamos construyendo este espacio</h3>
+          <p>Aqu&iacute; iremos digitalizando los procesos de la cl&iacute;nica odontol&oacute;gica. Algunas ideas para empezar:</p>
+          <ul class="soon-ideas"><li>🦷 Odontograma</li><li>📋 Registro de atenciones</li><li>📅 Citas y seguimientos</li><li>🧾 Tratamientos realizados</li></ul>
+        </section>
+      </section>
+
+      <section id="enfermeria" class="module">
+        <div class="module-head">
+          <button class="back-button" data-module="inicio" aria-label="Volver al inicio">&larr; Inicio</button>
+          <h2><span class="head-emoji" aria-hidden="true">👩&zwj;⚕️</span> Enfermer&iacute;a</h2>
+        </div>
+        <section class="panel soon-panel" style="--accent: var(--tile-enf)">
+          <span class="soon-emoji" aria-hidden="true">🚧</span>
+          <h3>Estamos construyendo este espacio</h3>
+          <p>Aqu&iacute; iremos digitalizando los procesos de enfermer&iacute;a. Algunas ideas para empezar:</p>
+          <ul class="soon-ideas"><li>🩹 Procedimientos</li><li>🌡️ Signos vitales</li><li>💉 Aplicaci&oacute;n de medicamentos</li><li>📦 Inventario de insumos</li></ul>
+        </section>
+      </section>
+
+      <section id="vacunaciones" class="module">
+        <div class="module-head">
+          <button class="back-button" data-module="ocupacional" aria-label="Volver a Cl&iacute;nica Ocupacional">&larr; Cl&iacute;nica Ocupacional</button>
+          <h2><span class="head-emoji" aria-hidden="true">💉</span> Vacunaciones</h2>
         </div>
         <section class="panel search-panel">
           <label class="search-big">
@@ -354,8 +427,8 @@
 
       <section id="fenix" class="module">
         <div class="module-head">
-          <button class="back-button" data-module="inicio" aria-label="Volver al inicio">&larr; Inicio</button>
-          <h2>Resultados FENIX</h2>
+          <button class="back-button" data-module="ocupacional" aria-label="Volver a Cl&iacute;nica Ocupacional">&larr; Cl&iacute;nica Ocupacional</button>
+          <h2><span class="head-emoji" aria-hidden="true">🧪</span> Resultados FENIX</h2>
         </div>
         <section class="panel">
           <div class="panel-header">
@@ -402,8 +475,8 @@
 
       <section id="respaldos" class="module">
         <div class="module-head">
-          <button class="back-button" data-module="inicio" aria-label="Volver al inicio">&larr; Inicio</button>
-          <h2>Respaldos</h2>
+          <button class="back-button" data-module="ocupacional" aria-label="Volver a Cl&iacute;nica Ocupacional">&larr; Cl&iacute;nica Ocupacional</button>
+          <h2><span class="head-emoji" aria-hidden="true">💾</span> Respaldos</h2>
         </div>
         <section class="panel">
           <div class="panel-header">
@@ -424,6 +497,6 @@
       </section>
     </main>
 
-    <script src="./app.js?v=siso-20261026-ficha"></script>
+    <script src="./app.js?v=siso-20261026-clinicas"></script>
   </body>
 </html>
