@@ -560,6 +560,7 @@ function showAppForUser(user) {
       .join("");
   }
   switchModule("inicio");
+  if (state.initDone) tryRestoreFolder();
   $("brandInitials").textContent = user.username === "DRLEAL" ? "" : "MO";
 }
 
@@ -975,12 +976,20 @@ function buildBackupPayload() {
 }
 
 function backupFileName() {
-  const stamp = new Date().toISOString().slice(0, 19).replaceAll(":", "-");
+  const stamp = localStamp(true);
   return `respaldo_medicina_ocupacional_${stamp}.json`;
 }
 
+// Fecha y hora de la computadora (no hora internacional).
+function localStamp(withTime = false) {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return withTime ? `${date}T${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}` : date;
+}
+
 function backupStamp() {
-  return new Date().toISOString().slice(0, 10);
+  return localStamp();
 }
 
 function safeFolderName(value) {
@@ -1366,7 +1375,98 @@ async function collectCsvFiles(directoryHandle, prefix = "") {
   return files;
 }
 
-async function loadSisoFolder() {
+// ---------- Recordar la carpeta SISO (IndexedDB) ----------
+function idbOpen() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open("siso", 1);
+    request.onupgradeneeded = () => request.result.createObjectStore("handles");
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function idbGet(key) {
+  try {
+    const db = await idbOpen();
+    return await new Promise((resolve, reject) => {
+      const req = db.transaction("handles").objectStore("handles").get(key);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function idbSet(key, value) {
+  try {
+    const db = await idbOpen();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction("handles", "readwrite");
+      tx.objectStore("handles").put(value, key);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch {
+    // Sin IndexedDB: se pedira la carpeta cada vez.
+  }
+}
+
+function setFolderBanner(mode, name = "") {
+  const banner = $("folderBanner");
+  if (!banner) return;
+  if (mode === "hidden") {
+    banner.hidden = true;
+    return;
+  }
+  banner.hidden = false;
+  banner.dataset.mode = mode;
+  $("folderBannerTitle").textContent = mode === "reconnect" ? `Carpeta guardada: ${name || "RESPALDO DE SISO"}` : "Conecta la carpeta SISO";
+  $("folderBannerText").textContent =
+    mode === "reconnect"
+      ? 'Presiona "Conectar" y luego "Permitir" para cargar tus datos. Si Chrome ofrece "Permitir siempre", elígelo y ya no tendrás que hacerlo.'
+      : "Elige la carpeta RESPALDO DE SISO de OneDrive una sola vez; SISO la recordará.";
+  $("folderBannerBtn").textContent = mode === "reconnect" ? "📂 Conectar carpeta" : "📂 Seleccionar carpeta SISO";
+}
+
+// Al abrir SISO: si Chrome ya dio permiso, carga sola; si no, muestra el boton para reconectar.
+async function tryRestoreFolder() {
+  if (state.sisoDirectoryHandle || !window.showDirectoryPicker) {
+    if (!window.showDirectoryPicker) setFolderBanner("hidden");
+    return;
+  }
+  const saved = await idbGet("sisoFolder");
+  if (!saved || !saved.queryPermission) {
+    setFolderBanner("pick");
+    return;
+  }
+  try {
+    if ((await saved.queryPermission({ mode: "readwrite" })) === "granted") {
+      await loadSisoFolder(saved);
+      return;
+    }
+  } catch {
+    // se mostrara el boton
+  }
+  setFolderBanner("reconnect", saved.name);
+}
+
+async function folderBannerClick() {
+  const saved = await idbGet("sisoFolder");
+  if (saved && saved.requestPermission) {
+    try {
+      if ((await saved.requestPermission({ mode: "readwrite" })) === "granted") {
+        await loadSisoFolder(saved);
+        return;
+      }
+    } catch {
+      // si falla, se pide elegir la carpeta
+    }
+  }
+  await loadSisoFolder();
+}
+
+async function loadSisoFolder(presetDirectory) {
   const status = $("folderImportInfo");
   if (!window.showDirectoryPicker) {
     status.textContent = "Tu navegador no permite seleccionar carpetas. Usa Edge o Chrome actualizado, o sube los CSV con los botones individuales.";
@@ -1376,7 +1476,10 @@ async function loadSisoFolder() {
   const button = $("loadSisoFolder");
   if (button.disabled) return;
   try {
-    const directory = await window.showDirectoryPicker({ mode: "readwrite" });
+    const directory =
+      presetDirectory && presetDirectory.kind === "directory" ? presetDirectory : await window.showDirectoryPicker({ mode: "readwrite" });
+    idbSet("sisoFolder", directory);
+    setFolderBanner("hidden");
     showBusy("Cargando carpeta SISO...");
     button.disabled = true;
     button.textContent = "Leyendo carpeta...";
@@ -1726,18 +1829,22 @@ async function moveToIncorporated(root, items) {
 
 // Usa la carpeta SISO ya elegida en esta sesion; solo pregunta si aun no se eligio o si no hay permiso.
 async function getSisoDirectory() {
-  const current = state.sisoDirectoryHandle;
+  const current = state.sisoDirectoryHandle || (await idbGet("sisoFolder"));
   if (current && current.queryPermission) {
     try {
       let permission = await current.queryPermission({ mode: "readwrite" });
       if (permission === "prompt") permission = await current.requestPermission({ mode: "readwrite" });
-      if (permission === "granted") return current;
+      if (permission === "granted") {
+        state.sisoDirectoryHandle = current;
+        return current;
+      }
     } catch (error) {
       // Si falla, se vuelve a pedir la carpeta.
     }
   }
   const directory = await window.showDirectoryPicker({ mode: "readwrite" });
   state.sisoDirectoryHandle = directory;
+  idbSet("sisoFolder", directory);
   return directory;
 }
 
@@ -2000,6 +2107,7 @@ async function init() {
 
   initDetailSections();
   $("mobileLogout").addEventListener("click", () => $("logoutButton").click());
+  $("folderBannerBtn").addEventListener("click", folderBannerClick);
   $("hepbList").addEventListener("change", (event) => {
     const select = event.target.closest("[data-merge-from]");
     if (!select || !select.value) return;
@@ -2046,6 +2154,8 @@ async function init() {
     openFenixPdf(button.dataset.openFenix);
   });
   $("excelConvertUpload").addEventListener("change", handleExcelConvertUpload);
+  state.initDone = true;
+  if (state.user) tryRestoreFolder();
 }
 
 async function loadInitialData() {
