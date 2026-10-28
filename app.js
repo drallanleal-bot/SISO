@@ -412,6 +412,20 @@ function renderHepBPanel() {
                 </select>
               </label>`
             : ""}
+          ${(recordsByPerson.get(key) || []).length
+            ? `<div class="edit-person">
+                <button class="ghost-button edit-person-toggle" data-edit-person="${escapeHtml(key)}">✏️ Corregir nombre o código</button>
+                <div class="edit-person-form" data-edit-form="${escapeHtml(key)}" hidden>
+                  <label>Nombre<input data-edit-name value="${escapeHtml(person.nombre || "")}" list="headcountNames" autocomplete="off" /></label>
+                  <label>Código<input data-edit-code value="${escapeHtml(normalizeCode(person.codigo))}" placeholder="Sin código" inputmode="numeric" /></label>
+                  <div class="edit-person-buttons">
+                    <button class="primary-button" data-edit-save="${escapeHtml(key)}">Guardar</button>
+                    <button class="ghost-button" data-edit-cancel="${escapeHtml(key)}">Cancelar</button>
+                  </div>
+                  <small>Se corrige en todas sus vacunas (${(recordsByPerson.get(key) || []).length} registro(s)). Si escribes un código del Head Count, se usa su nombre oficial.</small>
+                </div>
+              </div>`
+            : ""}
         </article>`;
     })
     .join("");
@@ -430,6 +444,39 @@ function personLabel(key) {
 }
 
 // Une a dos personas: todos los registros de "from" pasan al nombre y codigo de "to".
+// Corrige nombre y/o codigo de una persona en todos sus registros de vacunas.
+async function renamePerson(key, newName, newCode) {
+  const nombre = String(newName || "").trim().replace(/\s+/g, " ").toUpperCase();
+  const codigo = normalizeCode(newCode);
+  if (!nombre) {
+    alert("Escribe el nombre.");
+    return;
+  }
+  const records = state.data.records.filter((r) => personKey(r) === key);
+  if (!records.length) return;
+  const newKey = personKey({ codigo, nombre });
+  const others = state.data.records.filter((r) => personKey(r) === newKey && personKey(r) !== key);
+  if (others.length && !window.confirm(`Ya existen ${others.length} registro(s) de "${others[0].nombre}" con ese código o nombre. ¿Unirlos con esta persona?`)) return;
+  showBusy("Corrigiendo nombre...");
+  state.data.records = mergeVaccinationRecords(
+    [],
+    state.data.records.map((r) => (personKey(r) === key ? { ...r, nombre, codigo } : r)),
+  );
+  persistVaccinationData();
+  const saved = await saveConsolidatedIfPossible();
+  populateFilters();
+  $("searchInput").value = codigo || nombre.toLowerCase();
+  applyFilters();
+  const status = $("mergeStatus");
+  if (status) {
+    status.hidden = false;
+    status.textContent = saved
+      ? `Listo: ${records.length} registro(s) ahora están como ${nombre} (${codigo || "S/C"}). Consolidado actualizado en la carpeta SISO.`
+      : `Listo: ${records.length} registro(s) corregidos. Para guardarlo en OneDrive, conecta la carpeta SISO.`;
+  }
+  hideBusy(true, saved ? "Nombre corregido y guardado" : "Corregido (falta guardar en carpeta)");
+}
+
 async function mergePeople(fromKey, toKey) {
   const target = personLabel(toKey);
   const source = personLabel(fromKey);
@@ -716,6 +763,11 @@ function renderSummary() {
 }
 
 function populateFilters() {
+  if ($("headcountNames")) {
+    $("headcountNames").innerHTML = (state.data.headcount || [])
+      .map((p) => `<option value="${escapeHtml(p.nombre)}">${escapeHtml(p.codigo || "")}</option>`)
+      .join("");
+  }
   const records = state.data.records;
   fillSelect($("yearFilter"), uniqueOptions(records, "anio"), "Todos los años");
   fillSelect($("vaccineFilter"), uniqueOptions(records, "vacuna"), "Todas las vacunas");
@@ -2147,6 +2199,32 @@ async function init() {
   $("hepbList").addEventListener("click", (event) => {
     const button = event.target.closest("[data-open-fenix]");
     if (button) openFenixPdf(button.dataset.openFenix);
+    const toggle = event.target.closest("[data-edit-person]");
+    const cancel = event.target.closest("[data-edit-cancel]");
+    const save = event.target.closest("[data-edit-save]");
+    const formFor = (key) => [...document.querySelectorAll("[data-edit-form]")].find((f) => f.dataset.editForm === key);
+    if (toggle) {
+      const form = formFor(toggle.dataset.editPerson);
+      form.hidden = !form.hidden;
+      toggle.hidden = !form.hidden;
+      if (!form.hidden) form.querySelector("[data-edit-name]").focus();
+    }
+    if (cancel) {
+      formFor(cancel.dataset.editCancel).hidden = true;
+      document.querySelector(`[data-edit-person="${CSS.escape(cancel.dataset.editCancel)}"]`).hidden = false;
+    }
+    if (save) {
+      const form = formFor(save.dataset.editSave);
+      renamePerson(save.dataset.editSave, form.querySelector("[data-edit-name]").value, form.querySelector("[data-edit-code]").value);
+    }
+  });
+  // Al escribir un codigo del Head Count, se propone su nombre oficial.
+  $("hepbList").addEventListener("input", (event) => {
+    const codeInput = event.target.closest("[data-edit-code]");
+    if (!codeInput) return;
+    const code = normalizeCode(codeInput.value).replace(/^0+/, "");
+    const match = code && state.data.headcount.find((p) => normalizeCode(p.codigo).replace(/^0+/, "") === code);
+    if (match) codeInput.closest("[data-edit-form]").querySelector("[data-edit-name]").value = match.nombre;
   });
   $("fenixTableBody").addEventListener("click", (event) => {
     const button = event.target.closest("[data-open-fenix]");

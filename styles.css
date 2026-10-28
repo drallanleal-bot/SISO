@@ -2339,3 +2339,46 @@ select:disabled {
     width: 100%;
   }
 }
+
+/* Corregir nombre o código */
+.edit-person {
+  margin-top: 10px;
+}
+
+.edit-person-toggle {
+  width: 100%;
+  min-height: 40px;
+  font-size: 13px;
+}
+
+.edit-person-toggle[hidden],
+.edit-person-form[hidden] {
+  display: none;
+}
+
+.edit-person-form {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #f7faf9;
+  border: 1px solid var(--line);
+}
+
+.edit-person-form label {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.edit-person-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.edit-person-form small {
+  color: var(--muted);
+  font-size: 12px;
+}
