@@ -785,7 +785,8 @@ function renderCompare() {
   } else if (cmpState.showAll) {
     view = ranking.map((row, i) => (i < CMP.topLab ? top[i] : cmpEnrich(row, base, comp, i + 1)));
   } else {
-    view = top;
+    // Top 15: ordenado por puntos TOTALES (laboratorio + medidas); se reordena al escribir.
+    view = finals;
   }
   if ($("cmpShowAll")) $("cmpShowAll").textContent = cmpState.showAll ? `Ver solo el Top ${CMP.topLab}` : `Ver los ${formatNumber(ranking.length)}`;
   const winners = new Set(finals.slice(0, CMP.topFinal).map((r) => r.person.key));
@@ -798,7 +799,11 @@ function renderCompare() {
       .join("");
   const rows = view
     .map((r) => `<tr class="${winners.has(r.person.key) && anyMeasures ? "cmp-top" : ""}">
-        <td class="cmp-pos">${r.pos}${r.pos > CMP.topLab ? `<small>de ${formatNumber(ranking.length)}</small>` : ""}</td>
+        <td class="cmp-pos">${
+          !query && !cmpState.showAll
+            ? `<b>${finals.indexOf(r) + 1}</b><small>lab #${r.pos}</small>`
+            : `${r.pos}<small>${r.pos > CMP.topLab ? `de ${formatNumber(ranking.length)}` : "lab"}</small>`
+        }</td>
         <td><strong>${escapeHtml(r.person.nombre)}</strong><small>${escapeHtml(r.person.dpi || r.person.codigo || "")}</small><span class="pdf-links">${pdfButtons(r)}</span></td>
         ${MARKERS.map((mk) => changeCell(r.lab.detail[mk.key])).join("")}
         <td class="cmp-pts">${r.lab.score.toFixed(0)}</td>
@@ -820,7 +825,7 @@ function renderCompare() {
     <div class="table-wrap cmp-table">
       <table>
         <thead><tr>
-          <th>#</th><th>Colaborador</th>
+          <th>${!query && !cmpState.showAll ? "Lugar" : "#"}</th><th>Colaborador</th>
           ${MARKERS.map((mk) => `<th>${mk.label}<small>${base} → ${comp}</small></th>`).join("")}
           <th>Pts lab</th><th>Peso (kg)</th><th>% grasa</th><th>Presión</th><th>Total</th>
         </tr></thead>
@@ -872,7 +877,16 @@ async function cmpSaveInlineMeasure(input) {
   cmpState.registry[comp][person.key] = entry;
   saveJsonSafe(CMP.registryKey, cmpState.registry);
   await saveRegistryToFolder(comp);
+  // Recordar en que casilla estaba el cursor para regresar ahi despues de reordenar.
+  const active = document.activeElement?.closest?.("[data-measure]");
+  const focus = active ? { person: active.dataset.person, measure: active.dataset.measure } : null;
   renderCompare();
+  if (focus) {
+    const again = [...document.querySelectorAll("#cmpResults [data-measure]")].find(
+      (el) => el.dataset.person === focus.person && el.dataset.measure === focus.measure,
+    );
+    if (again) again.focus();
+  }
   renderRegistry();
 }
 

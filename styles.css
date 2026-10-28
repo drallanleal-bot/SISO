@@ -2382,3 +2382,9 @@ select:disabled {
   color: var(--muted);
   font-size: 12px;
 }
+
+.cmp-pos b {
+  display: block;
+  font-size: 18px;
+  color: #b45309;
+}
