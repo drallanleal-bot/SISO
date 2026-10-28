@@ -707,14 +707,16 @@ function cmpRanking(base, comp) {
     .sort((a, b) => b.lab.score - a.lab.score);
 }
 
+function cmpEnrich(row, base, comp, pos) {
+  const mBefore = measuresFor(row.person, base);
+  const mAfter = measuresFor(row.person, comp);
+  const body = bodyScore(mBefore, mAfter);
+  return { ...row, pos, mBefore, mAfter, body, total: row.lab.score + body.score };
+}
+
 function cmpTop(base, comp) {
   const ranking = cmpRanking(base, comp);
-  const top = ranking.slice(0, CMP.topLab).map((row) => {
-    const mBefore = measuresFor(row.person, base);
-    const mAfter = measuresFor(row.person, comp);
-    const body = bodyScore(mBefore, mAfter);
-    return { ...row, mBefore, mAfter, body, total: row.lab.score + body.score };
-  });
+  const top = ranking.slice(0, CMP.topLab).map((row, i) => cmpEnrich(row, base, comp, i + 1));
   return { ranking, top, finals: [...top].sort((a, b) => b.total - a.total) };
 }
 
@@ -765,10 +767,32 @@ function renderCompare() {
     .join("");
   const input = (r, field, placeholder) =>
     `<span class="cmp-was">${base}: ${escapeHtml(r.mBefore[field] || "—")}</span><input data-measure="${field}" data-person="${escapeHtml(r.person.key)}" value="${escapeHtml(r.mAfter[field] || "")}" placeholder="${placeholder}" />`;
-  const rows = top
-    .map((r, i) => `<tr class="${finals.indexOf(r) < CMP.topFinal && anyMeasures ? "cmp-top" : ""}">
-        <td>${i + 1}</td>
-        <td><strong>${escapeHtml(r.person.nombre)}</strong><small>${escapeHtml(r.person.dpi || r.person.codigo || "")}</small></td>
+  // Vista: Top 15, todos, o lo que se busque (cualquier participante, con su lugar en el ranking).
+  const query = normalizeText($("cmpSearch")?.value || "").trim();
+  let view;
+  if (query) {
+    view = ranking
+      .map((row, i) => ({ row, pos: i + 1 }))
+      .filter(({ row }) => normalizeText(`${row.person.nombre} ${row.person.dpi || ""} ${row.person.codigo || ""}`).includes(query))
+      .map(({ row, pos }) => (pos <= CMP.topLab ? top[pos - 1] : cmpEnrich(row, base, comp, pos)));
+  } else if (cmpState.showAll) {
+    view = ranking.map((row, i) => (i < CMP.topLab ? top[i] : cmpEnrich(row, base, comp, i + 1)));
+  } else {
+    view = top;
+  }
+  if ($("cmpShowAll")) $("cmpShowAll").textContent = cmpState.showAll ? `Ver solo el Top ${CMP.topLab}` : `Ver los ${formatNumber(ranking.length)}`;
+  const winners = new Set(finals.slice(0, CMP.topFinal).map((r) => r.person.key));
+  const pdfButtons = (r) =>
+    [base, comp]
+      .map((y) => {
+        const file = r.person.files[y]?.[0];
+        return file ? `<button class="pdf-mini" data-open-fenix="${file.id}" title="Abrir laboratorio ${y}">PDF ${y}</button>` : "";
+      })
+      .join("");
+  const rows = view
+    .map((r) => `<tr class="${winners.has(r.person.key) && anyMeasures ? "cmp-top" : ""}">
+        <td class="cmp-pos">${r.pos}${r.pos > CMP.topLab ? `<small>de ${formatNumber(ranking.length)}</small>` : ""}</td>
+        <td><strong>${escapeHtml(r.person.nombre)}</strong><small>${escapeHtml(r.person.dpi || r.person.codigo || "")}</small><span class="pdf-links">${pdfButtons(r)}</span></td>
         ${MARKERS.map((mk) => changeCell(r.lab.detail[mk.key])).join("")}
         <td class="cmp-pts">${r.lab.score.toFixed(0)}</td>
         <td>${input(r, "peso_kg", `kg ${comp}`)}</td>
@@ -781,7 +805,9 @@ function renderCompare() {
   box.innerHTML = `
     ${anyMeasures ? `<div class="cmp-podium">${podium}</div>` : `<p class="cmp-hint">👇 Llena (o registra en "Registro de medidas") peso, % de grasa y presión ${comp} de estas ${top.length} personas para ver el Top ${CMP.topFinal} final.</p>`}
     <div class="cmp-toolbar">
-      <span>${formatNumber(ranking.length)} participantes con laboratorios comparables · se muestran los ${top.length} mejores</span>
+      <span>${formatNumber(ranking.length)} participantes con laboratorios comparables · ${
+        query ? `${formatNumber(view.length)} resultado(s) de la búsqueda` : cmpState.showAll ? "se muestran todos" : `se muestran los ${top.length} mejores`
+      }</span>
       <div><button class="primary-button" id="cmpExport">📊 Exportar Excel</button></div>
     </div>
     <div class="table-wrap cmp-table">
@@ -791,22 +817,23 @@ function renderCompare() {
           ${MARKERS.map((mk) => `<th>${mk.label}<small>${base} → ${comp}</small></th>`).join("")}
           <th>Pts lab</th><th>Peso (kg)</th><th>% grasa</th><th>Presión</th><th>Total</th>
         </tr></thead>
-        <tbody>${rows}</tbody>
+        <tbody>${rows || `<tr><td colspan="${MARKERS.length + 7}">Nadie con ese nombre o DPI tiene laboratorios comparables en ${base} y ${comp}.</td></tr>`}</tbody>
       </table>
     </div>`;
 }
 
 function cmpExport() {
   const { base, comp } = selectedYears();
-  const { top, finals } = cmpTop(base, comp);
+  const { ranking, top, finals } = cmpTop(base, comp);
+  const rows = ranking.map((row, i) => (i < CMP.topLab ? top[i] : cmpEnrich(row, base, comp, i + 1)));
   const cols = [];
   ["Col. total", "LDL", "HDL", "Triglic.", "Glucosa"].forEach((l) => cols.push(`${l} ${base}`, `${l} ${comp}`));
   downloadExcel(
     `fenix_ganadores_${base}_vs_${comp}.xls`,
     `Programa FENIX - Ganadores ${base} vs ${comp}`,
-    ["Lugar final", "Lugar laboratorio", "Nombre", "DPI / código", ...cols, "Puntos laboratorio", `Peso ${base}`, `Peso ${comp}`, `% grasa ${base}`, `% grasa ${comp}`, `PA ${base}`, `PA ${comp}`, "Puntos total"],
-    top.map((r, i) => [
-      finals.indexOf(r) + 1, i + 1, r.person.nombre, r.person.dpi || r.person.codigo || "",
+    ["Lugar final (Top 15)", "Lugar laboratorio", "Nombre", "DPI / código", ...cols, "Puntos laboratorio", `Peso ${base}`, `Peso ${comp}`, `% grasa ${base}`, `% grasa ${comp}`, `PA ${base}`, `PA ${comp}`, "Puntos total"],
+    rows.map((r) => [
+      r.pos <= CMP.topLab ? finals.findIndex((f) => f.person.key === r.person.key) + 1 : "", r.pos, r.person.nombre, r.person.dpi || r.person.codigo || "",
       ...MARKERS.flatMap((m) => [r.before?.[m.key] ?? "", r.after?.[m.key] ?? ""]),
       r.lab.score.toFixed(1), r.mBefore.peso_kg || "", r.mAfter.peso_kg || "", r.mBefore.grasa_pct || "", r.mAfter.grasa_pct || "",
       r.mBefore.presion_arterial || "", r.mAfter.presion_arterial || "", r.total.toFixed(1),
@@ -852,15 +879,22 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   ["cmpBaseYear", "cmpCompYear"].forEach((id) =>
     $(id).addEventListener("change", () => {
-      const base = $("cmpBaseYear").value;
-      const comp = $("cmpCompYear").value;
+      const years = availableYears();
+      let base = $("cmpBaseYear").value;
+      let comp = $("cmpCompYear").value;
+      // Si los años chocan, se ajusta el otro automaticamente.
       if (base >= comp) {
-        $("cmpStatus").textContent = "El año de comparación debe ser posterior al año base.";
+        if (id === "cmpCompYear") base = years.filter((y) => y < comp).pop() || base;
+        else comp = years.find((y) => y > base) || comp;
+      }
+      if (base >= comp) {
+        $("cmpStatus").textContent = "El año a comparar debe ser posterior al año base.";
         renderYearSelectors();
         return;
       }
       saveJsonSafe(CMP.prefsKey, { base, comp });
       $("cmpStatus").textContent = "";
+      cmpState.showAll = false;
       renderCompare();
     }),
   );
@@ -870,6 +904,14 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   $("cmpResults").addEventListener("click", (event) => {
     if (event.target.closest("#cmpExport")) cmpExport();
+    const pdf = event.target.closest("[data-open-fenix]");
+    if (pdf) openFenixPdf(pdf.dataset.openFenix);
+  });
+  $("cmpSearch").addEventListener("input", renderCompare);
+  $("cmpShowAll").addEventListener("click", () => {
+    cmpState.showAll = !cmpState.showAll;
+    $("cmpSearch").value = "";
+    renderCompare();
   });
 
   // Registro de medidas

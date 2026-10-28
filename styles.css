@@ -2219,3 +2219,50 @@ button:disabled {
     flex: 1;
   }
 }
+
+/* Consultar participantes del comparativo */
+.cmp-search {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.cmp-search input {
+  flex: 1;
+  min-height: 48px;
+  font-size: 16px;
+  padding: 0 14px;
+  border-radius: 12px;
+}
+
+.cmp-pos small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.pdf-links {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.pdf-mini {
+  min-height: 28px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  background: #eef4ff;
+  color: var(--tile-lab);
+}
+
+.pdf-mini:hover {
+  background: var(--tile-lab);
+  color: #fff;
+}
+
+@media (max-width: 640px) {
+  .cmp-search {
+    flex-direction: column;
+  }
+}
