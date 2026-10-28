@@ -40,13 +40,15 @@ const MEASURE_FIELDS = [
 ];
 const REGISTRY_COLUMNS = ["persona", "dpi", "codigo", "nombre", "fecha", ...MEASURE_FIELDS.map((f) => f.key), "registrado_por"];
 
+// penalty: cuanto mas resta si EMPEORA (colesterol total y trigliceridos pesan doble).
 const MARKERS = [
-  { key: "ct", label: "Col. total", better: "down", isNormal: (v) => v < 200 },
-  { key: "ldl", label: "LDL", better: "down", isNormal: (v) => v < 130 },
-  { key: "hdl", label: "HDL", better: "up", isNormal: (v) => v >= 40 },
-  { key: "tg", label: "Triglic.", better: "down", isNormal: (v) => v < 150 },
-  { key: "glu", label: "Glucosa", better: "down", isNormal: (v) => v < 100 },
+  { key: "ct", label: "Col. total", better: "down", isNormal: (v) => v < 200, penalty: 2 },
+  { key: "ldl", label: "LDL", better: "down", isNormal: (v) => v < 130, penalty: 1 },
+  { key: "hdl", label: "HDL", better: "up", isNormal: (v) => v >= 40, penalty: 1 },
+  { key: "tg", label: "Triglic.", better: "down", isNormal: (v) => v < 150, penalty: 2 },
+  { key: "glu", label: "Glucosa", better: "down", isNormal: (v) => v < 100, penalty: 1 },
 ];
+const WEIGHT_GAIN_PENALTY = 2; // subir de peso resta el doble de lo que suma bajarlo
 
 function loadJsonSafe(key, fallback) {
   try {
@@ -659,9 +661,9 @@ function labScore(before, after) {
     if (a == null || b == null || a <= 0) return;
     used += 1;
     const pct = m.better === "down" ? ((a - b) / a) * 100 : ((b - a) / a) * 100;
-    let pts = clip(pct, 50);
+    let pts = pct >= 0 ? clip(pct, 50) : clip(pct * m.penalty, 50 * m.penalty);
     if (!m.isNormal(a) && m.isNormal(b)) pts += 10;
-    if (m.isNormal(a) && !m.isNormal(b)) pts -= 10;
+    if (m.isNormal(a) && !m.isNormal(b)) pts -= 10 * m.penalty;
     score += pts;
     detail[m.key] = { a, b, pct, improved: pct > 0 };
   });
@@ -675,7 +677,7 @@ function bodyScore(before, after) {
   const w2 = toNum(after.peso_kg);
   if (w1 && w2) {
     const pct = ((w1 - w2) / w1) * 100;
-    score += clip(pct * 2, 25);
+    score += pct >= 0 ? clip(pct * 2, 25) : clip(pct * 2 * WEIGHT_GAIN_PENALTY, 25 * WEIGHT_GAIN_PENALTY);
     notes.push(`peso ${w1 - w2 >= 0 ? "−" : "+"}${Math.abs(w1 - w2).toFixed(1)} kg`);
   }
   const g1 = toNum(before.grasa_pct);
