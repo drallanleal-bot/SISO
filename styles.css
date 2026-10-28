@@ -2100,3 +2100,122 @@ button:disabled {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* ---------- Registro de medidas FENIX ---------- */
+.reg-panel {
+  border-top: 5px solid var(--tile-lab);
+}
+
+.reg-year,
+.cmp-years label {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.cmp-years {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.cmp-years span {
+  padding-bottom: 12px;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.reg-form {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.reg-form label {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.reg-person {
+  grid-column: span 3;
+}
+
+.reg-person small {
+  font-weight: 600;
+  color: var(--tile-lab);
+  min-height: 16px;
+}
+
+.reg-form input[readonly] {
+  background: #f1f5f4;
+}
+
+.reg-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.reg-buttons span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.reg-id {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.reg-actions {
+  white-space: nowrap;
+}
+
+.reg-actions button {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 12px;
+  margin-right: 4px;
+}
+
+.ghost-button.danger {
+  color: var(--red);
+  background: #fde8e8;
+}
+
+.cmp-table input.invalid {
+  border-color: var(--red);
+  background: #fde8e8;
+}
+
+@media (max-width: 1050px) {
+  .reg-form {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .reg-person {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 640px) {
+  .reg-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cmp-years {
+    width: 100%;
+  }
+
+  .cmp-years label {
+    flex: 1;
+  }
+}

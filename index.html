@@ -11,7 +11,7 @@
     <link rel="apple-touch-icon" href="icons/apple-touch-icon-kerns.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="SISO" />
-    <link rel="stylesheet" href="./styles.css?v=siso-20261027-fenix" />
+    <link rel="stylesheet" href="./styles.css?v=siso-20261027-fenix2" />
   </head>
   <body class="auth-locked">
     <section class="login-screen" id="loginScreen">
@@ -472,11 +472,50 @@
           </div>
         </section>
 
+        <section class="panel reg-panel" id="fenixRegistry">
+          <div class="panel-header">
+            <div>
+              <h3>📝 Registro de medidas FENIX</h3>
+              <p>Anota aqu&iacute; las medidas de cada jornada FENIX. Se guardan en OneDrive (FENIX/Programa_A&Ntilde;O) y se usan solas en el comparativo del a&ntilde;o siguiente.</p>
+            </div>
+            <label class="reg-year">A&ntilde;o<select id="regYear"></select></label>
+          </div>
+          <div class="reg-form">
+            <label class="reg-person">Colaborador
+              <input id="regPerson" list="regPeople" placeholder="Escribe nombre o c&oacute;digo..." autocomplete="off" />
+              <datalist id="regPeople"></datalist>
+              <small id="regPersonInfo"></small>
+            </label>
+            <label>Fecha<input id="regDate" type="date" /></label>
+            <label>Peso (kg)<input id="reg_peso_kg" inputmode="decimal" /></label>
+            <label>Talla (cm)<input id="reg_estatura_cm" inputmode="decimal" /></label>
+            <label>IMC<input id="reg_imc" readonly tabindex="-1" placeholder="Autom&aacute;tico" /></label>
+            <label>% grasa<input id="reg_grasa_pct" inputmode="decimal" /></label>
+            <label>Grasa visceral<input id="reg_grasa_visceral" inputmode="decimal" /></label>
+            <label>Masa muscular<input id="reg_masa_muscular" inputmode="decimal" /></label>
+            <label>Cintura (cm)<input id="reg_cintura_cm" inputmode="decimal" /></label>
+            <label>Presi&oacute;n<input id="reg_presion_arterial" placeholder="120/80" /></label>
+            <label>Frec. cardiaca<input id="reg_frecuencia_cardiaca" inputmode="numeric" /></label>
+          </div>
+          <div class="reg-buttons">
+            <button class="primary-button" id="regSave">💾 Guardar medidas</button>
+            <button class="ghost-button" id="regClear">Limpiar</button>
+            <button class="ghost-button" id="regExport">📊 Exportar Excel del a&ntilde;o</button>
+            <span id="regCount"></span>
+          </div>
+          <div id="regList"></div>
+        </section>
+
         <section class="panel cmp-panel" id="fenixCompare">
           <div class="panel-header">
             <div>
-              <h3>🏆 Ganadores del Programa FENIX: 2025 vs 2026</h3>
-              <p>Compara los laboratorios de quienes tienen FENIX en ambos a&ntilde;os. Todo se procesa en esta computadora; ning&uacute;n resultado sale de OneDrive.</p>
+              <h3>🏆 Ganadores del Programa FENIX</h3>
+              <p>Compara laboratorios y medidas de quienes tienen FENIX en ambos a&ntilde;os. Todo se procesa en esta computadora; ning&uacute;n resultado sale de OneDrive.</p>
+            </div>
+            <div class="cmp-years">
+              <label>A&ntilde;o base<select id="cmpBaseYear"></select></label>
+              <span aria-hidden="true">vs</span>
+              <label>Comparar con<select id="cmpCompYear"></select></label>
             </div>
           </div>
           <ol class="cmp-steps">
@@ -492,7 +531,7 @@
             </li>
             <li>
               <b>2. Top 15 por laboratorio</b>
-              <span>Busca a estas 15 personas en el sistema de expedientes y anota su peso, % de grasa y presi&oacute;n de 2026.</span>
+              <span>Si sus medidas de <b data-cmp-comp></b> no est&aacute;n en el Registro de medidas, b&uacute;scalas en el sistema de expedientes y an&oacute;talas en la tabla.</span>
             </li>
             <li>
               <b>3. Top 5 ganadores</b>
@@ -505,7 +544,7 @@
             <ul>
               <li><b>Laboratorio:</b> % de mejor&iacute;a de colesterol total, LDL, triglic&eacute;ridos y glucosa (que bajen) y HDL (que suba). Cada uno suma m&aacute;ximo 50 puntos.</li>
               <li><b>Bono:</b> +10 por cada valor que pas&oacute; de alterado a normal; &minus;10 si pas&oacute; de normal a alterado. Normal: colesterol &lt;200, LDL &lt;130, triglic&eacute;ridos &lt;150, HDL &ge;40, glucosa &lt;100.</li>
-              <li><b>Medidas 2026:</b> % de peso perdido &times;2 (m&aacute;x. 25), puntos de % de grasa bajados &times;2 (m&aacute;x. 20) y +10 si la presi&oacute;n pas&oacute; de alta (&ge;130/85) a normal.</li>
+              <li><b>Medidas:</b> % de peso perdido &times;2 (m&aacute;x. 25), puntos de % de grasa bajados &times;2 (m&aacute;x. 20) y +10 si la presi&oacute;n pas&oacute; de alta (&ge;130/85) a normal.</li>
               <li>Participan solo quienes tienen FENIX 2025 y 2026 con al menos 3 valores de l&iacute;pidos/glucosa en ambos a&ntilde;os.</li>
             </ul>
           </details>
@@ -536,7 +575,7 @@
       </section>
     </main>
 
-    <script src="./app.js?v=siso-20261027-fenix"></script>
-    <script src="./fenix-comparativo.js?v=siso-20261027-fenix"></script>
+    <script src="./app.js?v=siso-20261027-fenix2"></script>
+    <script src="./fenix-comparativo.js?v=siso-20261027-fenix2"></script>
   </body>
 </html>

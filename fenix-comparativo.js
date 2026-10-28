@@ -1,16 +1,18 @@
 // =====================================================================
-// SISO - Ganadores del Programa FENIX (2025 vs 2026)
-// Lee los PDF de laboratorio (imagenes escaneadas) con OCR en esta
-// computadora, compara 2025 contra 2026 y arma el ranking.
-// Ningun dato sale de la carpeta empresarial: el OCR corre en el navegador.
+// SISO - Programa FENIX
+//  1) Registro de medidas (peso, talla, grasa, presion...) por año.
+//  2) Ganadores: compara laboratorios y medidas entre dos años
+//     (2025 vs 2026, 2026 vs 2027, y asi sucesivamente).
+// Los PDF de laboratorio son imagenes escaneadas: se leen con OCR en esta
+// computadora. Ningun dato sale de la carpeta empresarial.
 // =====================================================================
 
 const CMP = {
-  years: ["2025", "2026"],
   ocrCacheKey: "siso_fenix_ocr_v1",
-  measuresKey: "siso_fenix_medidas_2026_v1",
+  registryKey: "siso_fenix_registro_v1",
+  legacyMeasuresKey: "siso_fenix_medidas_2026_v1",
+  prefsKey: "siso_fenix_comparativo_anios",
   ocrFile: "laboratorios_leidos_ocr.csv",
-  measuresFile: "medidas_2026_finalistas.csv",
   folder: "Comparativo",
   topLab: 15,
   topFinal: 5,
@@ -24,14 +26,19 @@ const CMP = {
   ],
 };
 
-const cmpState = {
-  antro2025: [],
-  vitals2025: [],
-  running: false,
-  stop: false,
-  ocr: loadJsonSafe(CMP.ocrCacheKey, {}),
-  measures: loadJsonSafe(CMP.measuresKey, {}),
-};
+// Campos de medidas. Los nombres coinciden con los CSV de antropometria / signos vitales.
+const MEASURE_FIELDS = [
+  { key: "peso_kg", label: "Peso (kg)", type: "decimal" },
+  { key: "estatura_cm", label: "Talla (cm)", type: "decimal" },
+  { key: "imc", label: "IMC", type: "auto" },
+  { key: "grasa_pct", label: "% grasa", type: "decimal" },
+  { key: "grasa_visceral", label: "Grasa visceral", type: "decimal" },
+  { key: "masa_muscular", label: "Masa muscular", type: "decimal" },
+  { key: "cintura_cm", label: "Cintura (cm)", type: "decimal" },
+  { key: "presion_arterial", label: "Presión (ej. 120/80)", type: "pa" },
+  { key: "frecuencia_cardiaca", label: "Frec. cardiaca", type: "decimal" },
+];
+const REGISTRY_COLUMNS = ["persona", "dpi", "codigo", "nombre", "fecha", ...MEASURE_FIELDS.map((f) => f.key), "registrado_por"];
 
 const MARKERS = [
   { key: "ct", label: "Col. total", better: "down", isNormal: (v) => v < 200 },
@@ -56,6 +63,32 @@ function saveJsonSafe(key, value) {
     // Sin almacenamiento local: se conserva en memoria y en la carpeta.
   }
 }
+
+const cmpState = {
+  imported: {}, // { año: { antro: [], vitals: [] } } desde FENIX_<año>_antropometria / _signos_vitales
+  registry: loadJsonSafe(CMP.registryKey, {}), // { año: { persona: entrada } }
+  ocr: loadJsonSafe(CMP.ocrCacheKey, {}),
+  running: false,
+  stop: false,
+  editingKey: null,
+};
+
+// Medidas 2026 capturadas en la version anterior -> registro 2026.
+(function migrateLegacyMeasures() {
+  const legacy = loadJsonSafe(CMP.legacyMeasuresKey, null);
+  if (!legacy) return;
+  cmpState.registry["2026"] = cmpState.registry["2026"] || {};
+  Object.entries(legacy).forEach(([persona, m]) => {
+    if (cmpState.registry["2026"][persona]) return;
+    cmpState.registry["2026"][persona] = { persona, peso_kg: m.peso || "", grasa_pct: m.grasa || "", presion_arterial: m.pa || "" };
+  });
+  saveJsonSafe(CMP.registryKey, cmpState.registry);
+  try {
+    localStorage.removeItem(CMP.legacyMeasuresKey);
+  } catch {
+    // nada
+  }
+})();
 
 // ---------- Lectura del texto del laboratorio ----------
 function cmpNumber(text) {
@@ -98,62 +131,12 @@ function lipidCount(values) {
   return ["ct", "ldl", "hdl", "tg", "glu"].filter((k) => values && values[k] != null).length;
 }
 
-// ---------- Participantes: FENIX 2025 y 2026 de la misma persona ----------
-function fenixDpi(record) {
-  const fromIndex = String(record.dpi || "").replace(/\D/g, "");
-  if (fromIndex.length === 13) return fromIndex;
-  const fromFile = String(record.archivo || record.ruta_relativa || "").match(/(?<!\d)(\d{13})(?!\d)/);
-  return fromFile ? fromFile[1] : "";
-}
-
-function cmpParticipants() {
-  const groups = [];
-  state.fenixRecords.forEach((record) => {
-    const year = String(record.anio || "").match(/20\d{2}/)?.[0];
-    if (!CMP.years.includes(year)) return;
-    const dpi = fenixDpi(record);
-    let group = groups.find((g) => (dpi && g.dpi === dpi) || (!dpi || !g.dpi ? samePerson(g, record) : false));
-    if (!group) {
-      group = { key: dpi ? `d:${dpi}` : `n:${normalizeText(record.nombre)}`, dpi, nombre: record.nombre, codigo: record.codigo, files: { 2025: [], 2026: [] } };
-      groups.push(group);
-    }
-    if (!group.dpi && dpi) group.dpi = dpi;
-    group.files[year].push(record);
-  });
-  return groups.filter((g) => g.files[2025].length && g.files[2026].length);
-}
-
-// ---------- Datos 2025 de antropometria y signos vitales ----------
-function cmpRowsFromCsv(text) {
-  const rows = parseCsv(text);
-  if (rows.length < 2) return [];
-  const headers = rows[0].map((h) => normalizeText(h));
-  return rows.slice(1).map((row) => Object.fromEntries(headers.map((h, i) => [h, String(row[i] ?? "").trim()])));
-}
-
-window.onSisoFolderLoaded = async (csvFiles) => {
-  for (const item of csvFiles) {
-    const path = normalizeText(item.path);
-    if (path.includes("antropometria") && path.includes("2025")) cmpState.antro2025 = cmpRowsFromCsv(await item.file.text());
-    if (path.includes("signos_vitales") && path.includes("2025")) cmpState.vitals2025 = cmpRowsFromCsv(await item.file.text());
-    if (path.endsWith(normalizeText(CMP.ocrFile))) mergeOcrCsv(await item.file.text());
-    if (path.endsWith(normalizeText(CMP.measuresFile))) mergeMeasuresCsv(await item.file.text());
-  }
-  renderCompare();
-};
-
-function find2025(rows, person) {
-  if (!rows.length) return null;
-  if (person.dpi) {
-    const byDpi = rows.find((r) => String(r.dpi || "").replace(/\D/g, "") === person.dpi);
-    if (byDpi) return byDpi;
-  }
-  return rows.find((r) => samePerson({ nombre: r.nombre }, { nombre: person.nombre })) || null;
-}
-
+// ---------- Utilidades ----------
 function toNum(value) {
-  const n = Number(String(value ?? "").replace(",", ".").replace(/[^\d.-]/g, ""));
-  return Number.isFinite(n) && String(value ?? "").trim() !== "" ? n : null;
+  const text = String(value ?? "").trim();
+  if (!text) return null;
+  const n = Number(text.replace(",", ".").replace(/[^\d.-]/g, ""));
+  return Number.isFinite(n) ? n : null;
 }
 
 function parsePA(value) {
@@ -161,7 +144,366 @@ function parsePA(value) {
   return m ? { sys: Number(m[1]), dia: Number(m[2]) } : null;
 }
 
-// ---------- OCR (pdf.js + Tesseract.js, cargados solo al usarlos) ----------
+function cmpRowsFromCsv(text) {
+  const rows = parseCsv(text);
+  if (rows.length < 2) return [];
+  const headers = rows[0].map((h) => normalizeText(h));
+  return rows.slice(1).map((row) => Object.fromEntries(headers.map((h, i) => [h, String(row[i] ?? "").trim()])));
+}
+
+function cmpCsv(columns, rows) {
+  return `﻿${[columns, ...rows.map((r) => columns.map((c) => r[c] ?? ""))]
+    .map((row) => row.map(csvEscape).join(","))
+    .join("\r\n")}`;
+}
+
+function fenixYear(record) {
+  return String(record.anio || "").match(/20\d{2}/)?.[0] || "";
+}
+
+function fenixDpi(record) {
+  const fromIndex = String(record.dpi || "").replace(/\D/g, "");
+  if (fromIndex.length === 13) return fromIndex;
+  const fromFile = String(record.archivo || record.ruta_relativa || "").match(/(?<!\d)(\d{13})(?!\d)/);
+  return fromFile ? fromFile[1] : "";
+}
+
+function personKeyFor(p) {
+  const dpi = String(p.dpi || "").replace(/\D/g, "");
+  if (dpi.length === 13) return `d:${dpi}`;
+  const code = normalizeCode(p.codigo);
+  if (code) return `c:${code.replace(/^0+/, "")}`;
+  return `n:${normalizeText(p.nombre)}`;
+}
+
+// Fecha de hoy en la hora de la computadora (no en hora internacional).
+function localToday() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function currentYear() {
+  return String(new Date().getFullYear());
+}
+
+// ---------- Años disponibles y selección ----------
+function availableYears() {
+  const years = new Set();
+  state.fenixRecords.forEach((r) => fenixYear(r) && years.add(fenixYear(r)));
+  Object.keys(cmpState.registry).forEach((y) => years.add(y));
+  Object.keys(cmpState.imported).forEach((y) => years.add(y));
+  return [...years].filter(Boolean).sort();
+}
+
+function selectedYears() {
+  const years = availableYears();
+  const saved = loadJsonSafe(CMP.prefsKey, null);
+  let base = saved?.base;
+  let comp = saved?.comp;
+  if (!years.includes(base) || !years.includes(comp) || base >= comp) {
+    comp = years[years.length - 1] || currentYear();
+    base = years[years.length - 2] || String(Number(comp) - 1);
+  }
+  return { base, comp };
+}
+
+function renderYearSelectors() {
+  const years = availableYears();
+  const { base, comp } = selectedYears();
+  const fill = (id, value) => {
+    const select = $(id);
+    if (!select) return;
+    select.innerHTML = years.map((y) => `<option value="${y}" ${y === value ? "selected" : ""}>${y}</option>`).join("");
+  };
+  fill("cmpBaseYear", base);
+  fill("cmpCompYear", comp);
+  document.querySelectorAll("[data-cmp-base]").forEach((el) => (el.textContent = base));
+  document.querySelectorAll("[data-cmp-comp]").forEach((el) => (el.textContent = comp));
+}
+
+// ---------- Participantes: FENIX en ambos años ----------
+function cmpParticipants(base, comp) {
+  const groups = [];
+  state.fenixRecords.forEach((record) => {
+    const year = fenixYear(record);
+    if (year !== base && year !== comp) return;
+    const dpi = fenixDpi(record);
+    let group = groups.find((g) => (dpi && g.dpi ? g.dpi === dpi : samePerson(g, record)));
+    if (!group) {
+      group = { dpi, nombre: record.nombre, codigo: record.codigo, files: { [base]: [], [comp]: [] } };
+      groups.push(group);
+    }
+    if (!group.dpi && dpi) group.dpi = dpi;
+    group.files[year].push(record);
+  });
+  return groups
+    .filter((g) => g.files[base].length && g.files[comp].length)
+    .map((g) => ({ ...g, key: personKeyFor(g) }));
+}
+
+// ---------- Medidas por año: archivos importados + registro en SISO ----------
+function findRow(rows, person) {
+  if (!rows || !rows.length) return null;
+  const dpi = String(person.dpi || "").replace(/\D/g, "");
+  if (dpi) {
+    const byDpi = rows.find((r) => String(r.dpi || "").replace(/\D/g, "") === dpi);
+    if (byDpi) return byDpi;
+  }
+  // Por nombre solo si no hay DPI distinto que demuestre que son personas diferentes.
+  return (
+    rows.find((r) => {
+      const rowDpi = String(r.dpi || "").replace(/\D/g, "");
+      if (dpi && rowDpi && rowDpi !== dpi) return false;
+      return samePerson({ nombre: r.nombre, codigo: r.codigo }, { nombre: person.nombre, codigo: person.codigo });
+    }) || null
+  );
+}
+
+function registryRows(year) {
+  return Object.values(cmpState.registry[year] || {});
+}
+
+function measuresFor(person, year) {
+  const imp = cmpState.imported[year] || {};
+  const reg = cmpState.registry[year]?.[person.key] || findRow(registryRows(year), person);
+  const out = { ...(findRow(imp.antro, person) || {}), ...(findRow(imp.vitals, person) || {}) };
+  if (reg) {
+    MEASURE_FIELDS.forEach((f) => {
+      if (String(reg[f.key] ?? "").trim() !== "") out[f.key] = reg[f.key];
+    });
+  }
+  return out;
+}
+
+// ---------- Carga desde la carpeta SISO ----------
+window.onSisoFolderLoaded = async (csvFiles) => {
+  for (const item of csvFiles) {
+    const path = normalizeText(item.path);
+    const year = path.match(/fenix_(20\d{2})_/)?.[1];
+    if (year && path.includes("antropometria")) {
+      cmpState.imported[year] = { ...(cmpState.imported[year] || {}), antro: cmpRowsFromCsv(await item.file.text()) };
+    } else if (year && path.includes("signos_vitales")) {
+      cmpState.imported[year] = { ...(cmpState.imported[year] || {}), vitals: cmpRowsFromCsv(await item.file.text()) };
+    } else if (year && path.includes("registro_medidas")) {
+      mergeRegistryCsv(year, await item.file.text());
+    } else if (path.endsWith(normalizeText(CMP.ocrFile))) {
+      mergeOcrCsv(await item.file.text());
+    }
+  }
+  renderRegistry();
+  renderCompare();
+};
+
+function mergeOcrCsv(text) {
+  cmpRowsFromCsv(text).forEach((row) => {
+    if (!row.ruta_relativa || cmpState.ocr[row.ruta_relativa]) return;
+    const entry = { anio: row.anio };
+    ["dpi", "fecha", "error"].forEach((k) => row[k] && (entry[k] = row[k]));
+    ["ct", "ldl", "hdl", "tg", "glu", "hba1c"].forEach((k) => toNum(row[k]) != null && (entry[k] = toNum(row[k])));
+    cmpState.ocr[row.ruta_relativa] = entry;
+  });
+  saveJsonSafe(CMP.ocrCacheKey, cmpState.ocr);
+}
+
+function mergeRegistryCsv(year, text) {
+  cmpState.registry[year] = cmpState.registry[year] || {};
+  cmpRowsFromCsv(text).forEach((row) => {
+    const persona = row.persona || personKeyFor(row);
+    if (!persona || cmpState.registry[year][persona]) return; // lo registrado en este equipo tiene prioridad
+    cmpState.registry[year][persona] = { ...row, persona };
+  });
+  saveJsonSafe(CMP.registryKey, cmpState.registry);
+}
+
+async function saveRegistryToFolder(year) {
+  if (!state.sisoDirectoryHandle) return false;
+  try {
+    const fenix = await getDirectory(state.sisoDirectoryHandle, "FENIX");
+    const dir = await getDirectory(fenix, `Programa_${year}`);
+    await writeTextFile(dir, `FENIX_${year}_registro_medidas.csv`, cmpCsv(REGISTRY_COLUMNS, registryRows(year)), "text/csv;charset=utf-8");
+    return true;
+  } catch (error) {
+    console.warn("No se guardo el registro en la carpeta", error);
+    return false;
+  }
+}
+
+async function saveOcrToFolder() {
+  if (!state.sisoDirectoryHandle) return false;
+  try {
+    const dir = await getDirectory(await getDirectory(state.sisoDirectoryHandle, "FENIX"), CMP.folder);
+    const columns = ["ruta_relativa", "anio", "dpi", "fecha", "ct", "ldl", "hdl", "tg", "glu", "hba1c", "error"];
+    const rows = Object.entries(cmpState.ocr).map(([ruta, v]) => ({ ruta_relativa: ruta, ...v }));
+    await writeTextFile(dir, CMP.ocrFile, cmpCsv(columns, rows), "text/csv;charset=utf-8");
+    return true;
+  } catch (error) {
+    console.warn("No se guardo el OCR en la carpeta", error);
+    return false;
+  }
+}
+
+// =====================================================================
+// 1) REGISTRO DE MEDIDAS
+// =====================================================================
+function registryPeople() {
+  const people = new Map();
+  const add = (p) => {
+    if (!p || !p.nombre) return;
+    const key = personKeyFor(p);
+    if (!people.has(key)) people.set(key, { key, nombre: p.nombre, codigo: normalizeCode(p.codigo), dpi: String(p.dpi || "").replace(/\D/g, "") });
+  };
+  (state.data?.headcount || []).forEach(add);
+  // Personas de FENIX que no estan en el Head Count (por nombre exacto) tambien se pueden registrar.
+  const names = new Set([...people.values()].map((p) => normalizeText(p.nombre)));
+  (state.fenixRecords || []).forEach((r) => {
+    if (!names.has(normalizeText(r.nombre))) add({ nombre: r.nombre, codigo: r.codigo, dpi: fenixDpi(r) });
+  });
+  return [...people.values()];
+}
+
+function regFindPerson(query) {
+  const q = normalizeText(query);
+  if (!q) return null;
+  const people = registryPeople();
+  return (
+    people.find((p) => `${p.nombre} · ${p.codigo || p.dpi || "S/C"}` === query) ||
+    people.find((p) => p.codigo && p.codigo === query.trim()) ||
+    people.find((p) => p.dpi && p.dpi === query.replace(/\D/g, "")) ||
+    null
+  );
+}
+
+function regFormYear() {
+  return $("regYear")?.value || currentYear();
+}
+
+function renderRegistry() {
+  const panel = $("fenixRegistry");
+  if (!panel) return;
+  const yearSelect = $("regYear");
+  const now = Number(currentYear());
+  const years = [...new Set([...availableYears(), String(now), String(now + 1)])].sort();
+  const current = yearSelect.value || String(now);
+  yearSelect.innerHTML = years.map((y) => `<option value="${y}" ${y === current ? "selected" : ""}>${y}</option>`).join("");
+  const options = registryPeople()
+    .slice(0, 3000)
+    .map((p) => `<option value="${escapeHtml(`${p.nombre} · ${p.codigo || p.dpi || "S/C"}`)}"></option>`)
+    .join("");
+  $("regPeople").innerHTML = options;
+
+  const year = regFormYear();
+  const rows = registryRows(year).sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || "")));
+  $("regCount").textContent = `${formatNumber(rows.length)} persona(s) registradas en FENIX ${year}`;
+  $("regList").innerHTML = rows.length
+    ? `<div class="table-wrap compact"><table>
+        <thead><tr><th>Fecha</th><th>Colaborador</th><th>Peso</th><th>IMC</th><th>% grasa</th><th>Cintura</th><th>PA</th><th>FC</th><th></th></tr></thead>
+        <tbody>${rows
+          .map(
+            (r) => `<tr>
+              <td>${escapeHtml(formatDate(r.fecha) || "")}</td>
+              <td><strong>${escapeHtml(r.nombre || "")}</strong><small class="reg-id">${escapeHtml(r.codigo || r.dpi || "S/C")}</small></td>
+              <td>${escapeHtml(r.peso_kg || "")}</td><td>${escapeHtml(r.imc || "")}</td><td>${escapeHtml(r.grasa_pct || "")}</td>
+              <td>${escapeHtml(r.cintura_cm || "")}</td><td>${escapeHtml(r.presion_arterial || "")}</td><td>${escapeHtml(r.frecuencia_cardiaca || "")}</td>
+              <td class="reg-actions"><button class="ghost-button" data-reg-edit="${escapeHtml(r.persona)}">Editar</button><button class="ghost-button danger" data-reg-delete="${escapeHtml(r.persona)}">Quitar</button></td>
+            </tr>`,
+          )
+          .join("")}</tbody></table></div>`
+    : '<p class="muted-line">Todavía no hay medidas registradas este año.</p>';
+}
+
+function regClearForm() {
+  cmpState.editingKey = null;
+  $("regPerson").value = "";
+  $("regPersonInfo").textContent = "";
+  $("regDate").value = localToday();
+  MEASURE_FIELDS.forEach((f) => ($(`reg_${f.key}`).value = ""));
+  $("regSave").textContent = "💾 Guardar medidas";
+}
+
+function regUpdateImc() {
+  const w = toNum($("reg_peso_kg").value);
+  const h = toNum($("reg_estatura_cm").value);
+  $("reg_imc").value = w && h ? (w / (h / 100) ** 2).toFixed(1) : "";
+}
+
+function regLoadEntry(key) {
+  const entry = cmpState.registry[regFormYear()]?.[key];
+  if (!entry) return;
+  cmpState.editingKey = key;
+  $("regPerson").value = `${entry.nombre} · ${entry.codigo || entry.dpi || "S/C"}`;
+  $("regPersonInfo").textContent = "Editando registro existente";
+  $("regDate").value = entry.fecha || "";
+  MEASURE_FIELDS.forEach((f) => ($(`reg_${f.key}`).value = entry[f.key] || ""));
+  $("regSave").textContent = "💾 Actualizar medidas";
+  $("fenixRegistry").scrollIntoView({ block: "start", behavior: "smooth" });
+}
+
+async function regSave() {
+  const year = regFormYear();
+  const typed = $("regPerson").value.trim();
+  const found = regFindPerson(typed);
+  const existing = cmpState.editingKey ? cmpState.registry[year]?.[cmpState.editingKey] : null;
+  const person = found || existing || (typed ? { nombre: typed.split(" · ")[0].toUpperCase(), codigo: "", dpi: "" } : null);
+  if (!person || !person.nombre) {
+    $("regPersonInfo").textContent = "Escribe o elige al colaborador.";
+    return;
+  }
+  const pa = $("reg_presion_arterial").value.trim();
+  if (pa && !parsePA(pa)) {
+    $("regPersonInfo").textContent = "La presión debe escribirse como 120/80.";
+    return;
+  }
+  const key = existing?.persona || personKeyFor(person);
+  const entry = {
+    persona: key,
+    dpi: person.dpi || "",
+    codigo: person.codigo || "",
+    nombre: person.nombre,
+    fecha: $("regDate").value || localToday(),
+    registrado_por: state.user?.label || "",
+  };
+  MEASURE_FIELDS.forEach((f) => (entry[f.key] = $(`reg_${f.key}`).value.trim()));
+  if (!MEASURE_FIELDS.some((f) => f.type !== "auto" && entry[f.key])) {
+    $("regPersonInfo").textContent = "Escribe al menos una medida.";
+    return;
+  }
+  cmpState.registry[year] = cmpState.registry[year] || {};
+  if (existing && existing.persona !== key) delete cmpState.registry[year][existing.persona];
+  cmpState.registry[year][key] = entry;
+  saveJsonSafe(CMP.registryKey, cmpState.registry);
+  const saved = await saveRegistryToFolder(year);
+  hideBusy(true, saved ? `Medidas de ${person.nombre} guardadas` : "Guardado en este equipo (falta seleccionar carpeta SISO)");
+  regClearForm();
+  renderRegistry();
+  renderYearSelectors();
+  renderCompare();
+  $("regPerson").focus();
+}
+
+async function regDelete(key) {
+  const year = regFormYear();
+  const entry = cmpState.registry[year]?.[key];
+  if (!entry || !window.confirm(`¿Quitar las medidas ${year} de ${entry.nombre}?`)) return;
+  delete cmpState.registry[year][key];
+  saveJsonSafe(CMP.registryKey, cmpState.registry);
+  await saveRegistryToFolder(year);
+  renderRegistry();
+  renderCompare();
+}
+
+function regExport() {
+  const year = regFormYear();
+  downloadExcel(
+    `fenix_${year}_registro_medidas.xls`,
+    `Programa FENIX ${year} - Registro de medidas`,
+    ["Fecha", "Código", "DPI", "Nombre", ...MEASURE_FIELDS.map((f) => f.label), "Registrado por"],
+    registryRows(year).map((r) => [formatDate(r.fecha), r.codigo || "", r.dpi || "", r.nombre, ...MEASURE_FIELDS.map((f) => r[f.key] || ""), r.registrado_por || ""]),
+  );
+}
+
+// =====================================================================
+// 2) GANADORES (comparativo entre dos años)
+// =====================================================================
 let pdfjsLib = null;
 let ocrWorker = null;
 
@@ -193,16 +535,15 @@ function cmpLoadScript(src) {
 async function cmpLoadOcr() {
   if (ocrWorker) return ocrWorker;
   if (!window.Tesseract) {
-    let lastError = null;
     for (const src of CMP.tesseractSources) {
       try {
         await cmpLoadScript(src);
         if (window.Tesseract) break;
       } catch (error) {
-        lastError = error;
+        console.warn(error);
       }
     }
-    if (!window.Tesseract) throw lastError || new Error("No se pudo cargar el lector de texto (OCR).");
+    if (!window.Tesseract) throw new Error("No se pudo cargar el lector de texto (OCR). Revisa la conexion a internet de la computadora.");
   }
   ocrWorker = await window.Tesseract.createWorker("eng");
   return ocrWorker;
@@ -240,11 +581,15 @@ async function cmpRun() {
     $("cmpStatus").textContent = "Primero ve a Vacunaciones → Cargar datos → Seleccionar carpeta SISO, para que SISO encuentre los PDF de FENIX.";
     return;
   }
-  const participants = cmpParticipants();
+  const { base, comp } = selectedYears();
   const pending = [];
-  participants.forEach((p) => CMP.years.forEach((y) => p.files[y].forEach((r) => {
-    if (!cmpState.ocr[r.ruta_relativa]) pending.push(r);
-  })));
+  cmpParticipants(base, comp).forEach((p) =>
+    [base, comp].forEach((y) =>
+      p.files[y].forEach((r) => {
+        if (!cmpState.ocr[r.ruta_relativa]) pending.push(r);
+      }),
+    ),
+  );
   cmpState.running = true;
   cmpState.stop = false;
   $("cmpRun").disabled = true;
@@ -259,12 +604,12 @@ async function cmpRun() {
       $("cmpStatus").textContent = `Leyendo ${done + 1} de ${pending.length}: ${record.nombre} (${record.anio}). Puedes seguir usando la computadora; no cierres SISO.`;
       try {
         const values = await cmpReadPdf(record);
-        cmpState.ocr[record.ruta_relativa] = { ...values, anio: String(record.anio), leido: new Date().toISOString().slice(0, 10) };
+        cmpState.ocr[record.ruta_relativa] = { ...values, anio: fenixYear(record), leido: localToday() };
       } catch (error) {
+        if (/cargar|conexion/i.test(error.message)) throw error;
         errors += 1;
         console.warn("No se pudo leer", record.ruta_relativa, error);
-        if (/cargar|conexion/i.test(error.message)) throw error;
-        cmpState.ocr[record.ruta_relativa] = { error: error.message.slice(0, 120), anio: String(record.anio) };
+        cmpState.ocr[record.ruta_relativa] = { error: error.message.slice(0, 120), anio: fenixYear(record) };
       }
       done += 1;
       $("cmpProgressBar").style.width = `${Math.round((done / Math.max(pending.length, 1)) * 100)}%`;
@@ -274,7 +619,7 @@ async function cmpRun() {
       }
     }
     saveJsonSafe(CMP.ocrCacheKey, cmpState.ocr);
-    await cmpSaveToFolder();
+    await saveOcrToFolder();
     hideBusy(true, cmpState.stop ? "Lectura detenida (se guardó el avance)" : "Laboratorios leídos");
     $("cmpStatus").textContent = cmpState.stop
       ? `Detenido. Se leyeron ${done} PDF; al volver a presionar el botón continúa donde se quedó.`
@@ -292,54 +637,6 @@ async function cmpRun() {
   }
 }
 
-// ---------- Guardar y recuperar en la carpeta (FENIX/Comparativo) ----------
-const OCR_COLUMNS = ["ruta_relativa", "anio", "dpi", "fecha", "ct", "ldl", "hdl", "tg", "glu", "hba1c", "error"];
-const MEASURE_COLUMNS = ["persona", "nombre", "dpi", "peso_2026", "grasa_2026", "pa_2026"];
-
-function cmpCsv(columns, rows) {
-  return `﻿${[columns, ...rows.map((r) => columns.map((c) => r[c] ?? ""))]
-    .map((row) => row.map(csvEscape).join(","))
-    .join("\r\n")}`;
-}
-
-function mergeOcrCsv(text) {
-  cmpRowsFromCsv(text).forEach((row) => {
-    if (!row.ruta_relativa || cmpState.ocr[row.ruta_relativa]) return;
-    const entry = { anio: row.anio };
-    ["dpi", "fecha", "error"].forEach((k) => row[k] && (entry[k] = row[k]));
-    ["ct", "ldl", "hdl", "tg", "glu", "hba1c"].forEach((k) => toNum(row[k]) != null && (entry[k] = toNum(row[k])));
-    cmpState.ocr[row.ruta_relativa] = entry;
-  });
-  saveJsonSafe(CMP.ocrCacheKey, cmpState.ocr);
-}
-
-function mergeMeasuresCsv(text) {
-  cmpRowsFromCsv(text).forEach((row) => {
-    if (!row.persona || cmpState.measures[row.persona]) return;
-    cmpState.measures[row.persona] = { peso: row.peso_2026, grasa: row.grasa_2026, pa: row.pa_2026 };
-  });
-  saveJsonSafe(CMP.measuresKey, cmpState.measures);
-}
-
-async function cmpSaveToFolder() {
-  if (!state.sisoDirectoryHandle) return false;
-  try {
-    const dir = await getDirectory(await getDirectory(state.sisoDirectoryHandle, "FENIX"), CMP.folder);
-    const ocrRows = Object.entries(cmpState.ocr).map(([ruta, v]) => ({ ruta_relativa: ruta, ...v }));
-    await writeTextFile(dir, CMP.ocrFile, cmpCsv(OCR_COLUMNS, ocrRows), "text/csv;charset=utf-8");
-    const people = cmpParticipants();
-    const measureRows = Object.entries(cmpState.measures).map(([persona, m]) => {
-      const p = people.find((x) => x.key === persona) || {};
-      return { persona, nombre: p.nombre || "", dpi: p.dpi || "", peso_2026: m.peso || "", grasa_2026: m.grasa || "", pa_2026: m.pa || "" };
-    });
-    await writeTextFile(dir, CMP.measuresFile, cmpCsv(MEASURE_COLUMNS, measureRows), "text/csv;charset=utf-8");
-    return true;
-  } catch (error) {
-    console.warn("No se guardo el comparativo en la carpeta", error);
-    return false;
-  }
-}
-
 // ---------- Puntajes ----------
 function bestValues(records) {
   // Si hay varios PDF en el año, se usa el que tenga mas valores (y el mas reciente).
@@ -352,13 +649,13 @@ function clip(value, limit) {
   return Math.max(-limit, Math.min(limit, value));
 }
 
-function labScore(v25, v26) {
+function labScore(before, after) {
   let score = 0;
   let used = 0;
   const detail = {};
   MARKERS.forEach((m) => {
-    const a = v25?.[m.key];
-    const b = v26?.[m.key];
+    const a = before?.[m.key];
+    const b = after?.[m.key];
     if (a == null || b == null || a <= 0) return;
     used += 1;
     const pct = m.better === "down" ? ((a - b) / a) * 100 : ((b - a) / a) * 100;
@@ -371,92 +668,91 @@ function labScore(v25, v26) {
   return { score: used >= 3 ? score : null, used, detail };
 }
 
-function bodyScore(person, antro, vitals) {
-  const m = cmpState.measures[person.key] || {};
+function bodyScore(before, after) {
   let score = 0;
   const notes = [];
-  const w25 = toNum(antro?.peso_kg);
-  const w26 = toNum(m.peso);
-  if (w25 && w26) {
-    const pct = ((w25 - w26) / w25) * 100;
+  const w1 = toNum(before.peso_kg);
+  const w2 = toNum(after.peso_kg);
+  if (w1 && w2) {
+    const pct = ((w1 - w2) / w1) * 100;
     score += clip(pct * 2, 25);
-    notes.push(`peso ${pct >= 0 ? "−" : "+"}${Math.abs(w25 - w26).toFixed(1)} kg`);
+    notes.push(`peso ${w1 - w2 >= 0 ? "−" : "+"}${Math.abs(w1 - w2).toFixed(1)} kg`);
   }
-  const g25 = toNum(antro?.grasa_pct);
-  const g26 = toNum(m.grasa);
-  if (g25 != null && g26 != null) {
-    score += clip((g25 - g26) * 2, 20);
-    notes.push(`grasa ${g25 - g26 >= 0 ? "−" : "+"}${Math.abs(g25 - g26).toFixed(1)} pts`);
+  const g1 = toNum(before.grasa_pct);
+  const g2 = toNum(after.grasa_pct);
+  if (g1 != null && g2 != null) {
+    score += clip((g1 - g2) * 2, 20);
+    notes.push(`grasa ${g1 - g2 >= 0 ? "−" : "+"}${Math.abs(g1 - g2).toFixed(1)} pts`);
   }
-  const p25 = parsePA(vitals?.presion_arterial);
-  const p26 = parsePA(m.pa);
-  if (p25 && p26) {
+  const p1 = parsePA(before.presion_arterial);
+  const p2 = parsePA(after.presion_arterial);
+  if (p1 && p2) {
     const high = (p) => p.sys >= 130 || p.dia >= 85;
-    if (high(p25) && !high(p26)) score += 10;
-    if (!high(p25) && high(p26)) score -= 10;
+    if (high(p1) && !high(p2)) score += 10;
+    if (!high(p1) && high(p2)) score -= 10;
   }
-  return { score, notes, filled: Boolean(m.peso || m.grasa || m.pa) };
+  const filled = ["peso_kg", "grasa_pct", "presion_arterial"].some((k) => String(after[k] ?? "").trim());
+  return { score, notes, filled };
 }
 
-function cmpRanking() {
-  return cmpParticipants()
+function cmpRanking(base, comp) {
+  return cmpParticipants(base, comp)
     .map((person) => {
-      const v25 = bestValues(person.files[2025]);
-      const v26 = bestValues(person.files[2026]);
-      if (!person.dpi) person.dpi = v26?.dpi || v25?.dpi || "";
-      const lab = labScore(v25, v26);
-      const antro = find2025(cmpState.antro2025, person);
-      const vitals = find2025(cmpState.vitals2025, person);
-      return { person, v25, v26, lab, antro, vitals };
+      const before = bestValues(person.files[base]);
+      const after = bestValues(person.files[comp]);
+      if (!person.dpi) person.dpi = after?.dpi || before?.dpi || "";
+      return { person, before, after, lab: labScore(before, after) };
     })
     .filter((row) => row.lab.score != null)
     .sort((a, b) => b.lab.score - a.lab.score);
 }
 
-// ---------- Pantalla ----------
-function fmt(value, digits = 0) {
-  return value == null ? "—" : Number(value).toFixed(digits);
+function cmpTop(base, comp) {
+  const ranking = cmpRanking(base, comp);
+  const top = ranking.slice(0, CMP.topLab).map((row) => {
+    const mBefore = measuresFor(row.person, base);
+    const mAfter = measuresFor(row.person, comp);
+    const body = bodyScore(mBefore, mAfter);
+    return { ...row, mBefore, mAfter, body, total: row.lab.score + body.score };
+  });
+  return { ranking, top, finals: [...top].sort((a, b) => b.total - a.total) };
 }
 
-function changeCell(d, digits = 0) {
+// ---------- Pantalla del comparativo ----------
+function fmt(value, digits = 0) {
+  return value == null || value === "" ? "—" : Number(value).toFixed(digits);
+}
+
+function changeCell(d) {
   if (!d) return '<td class="cmp-na">—</td>';
   const cls = d.improved ? "up" : d.pct === 0 ? "" : "down";
-  return `<td class="cmp-change ${cls}"><span>${fmt(d.a, digits)} → ${fmt(d.b, digits)}</span><small>${d.improved ? "▲" : d.pct === 0 ? "=" : "▼"} ${Math.abs(d.pct).toFixed(0)}%</small></td>`;
+  return `<td class="cmp-change ${cls}"><span>${fmt(d.a)} → ${fmt(d.b)}</span><small>${d.improved ? "▲" : d.pct === 0 ? "=" : "▼"} ${Math.abs(d.pct).toFixed(0)}%</small></td>`;
 }
 
 function renderCompare() {
   const box = $("cmpResults");
   if (!box) return;
-  const participants = cmpParticipants();
-  const totalFiles = participants.reduce((n, p) => n + p.files[2025].length + p.files[2026].length, 0);
-  const readFiles = participants.reduce(
-    (n, p) => n + [...p.files[2025], ...p.files[2026]].filter((r) => cmpState.ocr[r.ruta_relativa]).length,
-    0,
-  );
-  if ($("cmpParticipants")) {
-    $("cmpParticipants").textContent = state.fenixRecords.length
-      ? `${formatNumber(participants.length)} personas tienen FENIX 2025 y 2026 (${formatNumber(totalFiles)} PDF). Leídos: ${formatNumber(readFiles)}.` +
-        `${cmpState.antro2025.length ? ` Antropometría 2025: ${cmpState.antro2025.length}.` : " Falta FENIX_2025_antropometria.csv."}` +
-        `${cmpState.vitals2025.length ? ` Signos 2025: ${cmpState.vitals2025.length}.` : " Falta FENIX_2025_signos_vitales.csv."}`
-      : "Primero carga la carpeta SISO (Vacunaciones → Cargar datos).";
-  }
-  if ($("cmpRun")) $("cmpRun").textContent = readFiles && readFiles < totalFiles ? "📄 Continuar lectura de PDF" : readFiles ? "🔄 Leer PDF nuevos" : "📄 Leer laboratorios de los PDF";
+  renderYearSelectors();
+  const { base, comp } = selectedYears();
+  const participants = cmpParticipants(base, comp);
+  const files = participants.flatMap((p) => [...p.files[base], ...p.files[comp]]);
+  const readFiles = files.filter((r) => cmpState.ocr[r.ruta_relativa]).length;
+  const imp = cmpState.imported[base] || {};
+  const regBase = registryRows(base).length;
+  const regComp = registryRows(comp).length;
+  $("cmpParticipants").textContent = state.fenixRecords.length
+    ? `${formatNumber(participants.length)} personas tienen FENIX ${base} y ${comp} (${formatNumber(files.length)} PDF). Leídos: ${formatNumber(readFiles)}. ` +
+      `Medidas ${base}: ${formatNumber((imp.antro || []).length + regBase)} · Medidas ${comp}: ${formatNumber(regComp + ((cmpState.imported[comp] || {}).antro || []).length)}.`
+    : "Primero carga la carpeta SISO (Vacunaciones → Cargar datos).";
+  $("cmpRun").textContent = readFiles && readFiles < files.length ? "📄 Continuar lectura de PDF" : readFiles ? "🔄 Leer PDF nuevos" : "📄 Leer laboratorios de los PDF";
 
-  const ranking = cmpRanking();
+  const { ranking, top, finals } = cmpTop(base, comp);
   if (!ranking.length) {
-    box.innerHTML = readFiles
-      ? '<p class="muted-line">Aún no hay suficientes laboratorios leídos para comparar.</p>'
-      : "";
+    box.innerHTML = readFiles ? '<p class="muted-line">Aún no hay suficientes laboratorios leídos para comparar.</p>' : "";
     return;
   }
-  const top = ranking.slice(0, CMP.topLab).map((row) => {
-    const body = bodyScore(row.person, row.antro, row.vitals);
-    return { ...row, body, total: row.lab.score + body.score };
-  });
-  const finals = [...top].sort((a, b) => b.total - a.total);
   const anyMeasures = top.some((r) => r.body.filled);
   const medal = ["🥇", "🥈", "🥉", "🏅", "🏅"];
-
   const podium = finals
     .slice(0, CMP.topFinal)
     .map(
@@ -467,73 +763,86 @@ function renderCompare() {
       </article>`,
     )
     .join("");
-
+  const input = (r, field, placeholder) =>
+    `<span class="cmp-was">${base}: ${escapeHtml(r.mBefore[field] || "—")}</span><input data-measure="${field}" data-person="${escapeHtml(r.person.key)}" value="${escapeHtml(r.mAfter[field] || "")}" placeholder="${placeholder}" />`;
   const rows = top
-    .map((r, i) => {
-      const m = cmpState.measures[r.person.key] || {};
-      const finalPos = finals.indexOf(r);
-      return `<tr class="${finalPos < CMP.topFinal && anyMeasures ? "cmp-top" : ""}">
+    .map((r, i) => `<tr class="${finals.indexOf(r) < CMP.topFinal && anyMeasures ? "cmp-top" : ""}">
         <td>${i + 1}</td>
-        <td><strong>${escapeHtml(r.person.nombre)}</strong><small>${escapeHtml(r.person.dpi || "")}</small></td>
-        ${MARKERS.map((mk) => changeCell(r.lab.detail[mk.key], mk.key === "glu" ? 0 : 0)).join("")}
+        <td><strong>${escapeHtml(r.person.nombre)}</strong><small>${escapeHtml(r.person.dpi || r.person.codigo || "")}</small></td>
+        ${MARKERS.map((mk) => changeCell(r.lab.detail[mk.key])).join("")}
         <td class="cmp-pts">${r.lab.score.toFixed(0)}</td>
-        <td><span class="cmp-was">2025: ${fmt(toNum(r.antro?.peso_kg), 1)}</span><input data-measure="peso" data-person="${escapeHtml(r.person.key)}" value="${escapeHtml(m.peso || "")}" inputmode="decimal" placeholder="kg 2026" /></td>
-        <td><span class="cmp-was">2025: ${fmt(toNum(r.antro?.grasa_pct), 1)}</span><input data-measure="grasa" data-person="${escapeHtml(r.person.key)}" value="${escapeHtml(m.grasa || "")}" inputmode="decimal" placeholder="% 2026" /></td>
-        <td><span class="cmp-was">2025: ${escapeHtml(r.vitals?.presion_arterial || "—")}</span><input data-measure="pa" data-person="${escapeHtml(r.person.key)}" value="${escapeHtml(m.pa || "")}" placeholder="120/80" /></td>
+        <td>${input(r, "peso_kg", `kg ${comp}`)}</td>
+        <td>${input(r, "grasa_pct", `% ${comp}`)}</td>
+        <td>${input(r, "presion_arterial", "120/80")}</td>
         <td class="cmp-pts total">${r.total.toFixed(0)}</td>
-      </tr>`;
-    })
+      </tr>`)
     .join("");
 
   box.innerHTML = `
-    ${anyMeasures ? `<div class="cmp-podium">${podium}</div>` : `<p class="cmp-hint">👇 Llena peso, % de grasa y presión 2026 de estas ${top.length} personas para ver el Top ${CMP.topFinal} final. Se guarda solo.</p>`}
+    ${anyMeasures ? `<div class="cmp-podium">${podium}</div>` : `<p class="cmp-hint">👇 Llena (o registra en "Registro de medidas") peso, % de grasa y presión ${comp} de estas ${top.length} personas para ver el Top ${CMP.topFinal} final.</p>`}
     <div class="cmp-toolbar">
       <span>${formatNumber(ranking.length)} participantes con laboratorios comparables · se muestran los ${top.length} mejores</span>
-      <div>
-        <button class="ghost-button" id="cmpSave">💾 Guardar en carpeta</button>
-        <button class="primary-button" id="cmpExport">📊 Exportar Excel</button>
-      </div>
+      <div><button class="primary-button" id="cmpExport">📊 Exportar Excel</button></div>
     </div>
     <div class="table-wrap cmp-table">
       <table>
-        <thead>
-          <tr>
-            <th>#</th><th>Colaborador</th>
-            ${MARKERS.map((mk) => `<th>${mk.label}<small>2025 → 2026</small></th>`).join("")}
-            <th>Pts lab</th><th>Peso (kg)</th><th>% grasa</th><th>Presión</th><th>Total</th>
-          </tr>
-        </thead>
+        <thead><tr>
+          <th>#</th><th>Colaborador</th>
+          ${MARKERS.map((mk) => `<th>${mk.label}<small>${base} → ${comp}</small></th>`).join("")}
+          <th>Pts lab</th><th>Peso (kg)</th><th>% grasa</th><th>Presión</th><th>Total</th>
+        </tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>`;
 }
 
 function cmpExport() {
-  const ranking = cmpRanking().slice(0, CMP.topLab).map((row) => {
-    const body = bodyScore(row.person, row.antro, row.vitals);
-    return { ...row, body, total: row.lab.score + body.score };
-  });
-  const finals = [...ranking].sort((a, b) => b.total - a.total);
-  const m = (row, key) => (cmpState.measures[row.person.key] || {})[key] || "";
+  const { base, comp } = selectedYears();
+  const { top, finals } = cmpTop(base, comp);
+  const cols = [];
+  ["Col. total", "LDL", "HDL", "Triglic.", "Glucosa"].forEach((l) => cols.push(`${l} ${base}`, `${l} ${comp}`));
   downloadExcel(
-    "fenix_ganadores_2025_vs_2026.xls",
-    "Programa FENIX - Ganadores 2025 vs 2026",
-    [
-      "Lugar final", "Lugar laboratorio", "Nombre", "DPI",
-      "Col. total 2025", "Col. total 2026", "LDL 2025", "LDL 2026", "HDL 2025", "HDL 2026",
-      "Triglic. 2025", "Triglic. 2026", "Glucosa 2025", "Glucosa 2026",
-      "Puntos laboratorio", "Peso 2025", "Peso 2026", "% grasa 2025", "% grasa 2026", "PA 2025", "PA 2026", "Puntos total",
-    ],
-    ranking.map((r, i) => [
-      finals.indexOf(r) + 1, i + 1, r.person.nombre, r.person.dpi || "",
-      r.v25?.ct ?? "", r.v26?.ct ?? "", r.v25?.ldl ?? "", r.v26?.ldl ?? "", r.v25?.hdl ?? "", r.v26?.hdl ?? "",
-      r.v25?.tg ?? "", r.v26?.tg ?? "", r.v25?.glu ?? "", r.v26?.glu ?? "",
-      r.lab.score.toFixed(1), r.antro?.peso_kg ?? "", m(r, "peso"), r.antro?.grasa_pct ?? "", m(r, "grasa"),
-      r.vitals?.presion_arterial ?? "", m(r, "pa"), r.total.toFixed(1),
+    `fenix_ganadores_${base}_vs_${comp}.xls`,
+    `Programa FENIX - Ganadores ${base} vs ${comp}`,
+    ["Lugar final", "Lugar laboratorio", "Nombre", "DPI / código", ...cols, "Puntos laboratorio", `Peso ${base}`, `Peso ${comp}`, `% grasa ${base}`, `% grasa ${comp}`, `PA ${base}`, `PA ${comp}`, "Puntos total"],
+    top.map((r, i) => [
+      finals.indexOf(r) + 1, i + 1, r.person.nombre, r.person.dpi || r.person.codigo || "",
+      ...MARKERS.flatMap((m) => [r.before?.[m.key] ?? "", r.after?.[m.key] ?? ""]),
+      r.lab.score.toFixed(1), r.mBefore.peso_kg || "", r.mAfter.peso_kg || "", r.mBefore.grasa_pct || "", r.mAfter.grasa_pct || "",
+      r.mBefore.presion_arterial || "", r.mAfter.presion_arterial || "", r.total.toFixed(1),
     ]),
   );
 }
 
+// Lo que se escribe en la tabla de ganadores tambien queda en el registro del año comparado.
+async function cmpSaveInlineMeasure(input) {
+  const { base, comp } = selectedYears();
+  const person = cmpParticipants(base, comp).find((p) => p.key === input.dataset.person);
+  if (!person) return;
+  const value = input.value.trim();
+  if (input.dataset.measure === "presion_arterial" && value && !parsePA(value)) {
+    input.classList.add("invalid");
+    return;
+  }
+  input.classList.remove("invalid");
+  cmpState.registry[comp] = cmpState.registry[comp] || {};
+  const entry = cmpState.registry[comp][person.key] || {
+    persona: person.key,
+    dpi: person.dpi || "",
+    codigo: normalizeCode(person.codigo),
+    nombre: person.nombre,
+    fecha: localToday(),
+    registrado_por: state.user?.label || "",
+  };
+  entry[input.dataset.measure] = value;
+  cmpState.registry[comp][person.key] = entry;
+  saveJsonSafe(CMP.registryKey, cmpState.registry);
+  await saveRegistryToFolder(comp);
+  renderCompare();
+  renderRegistry();
+}
+
+// ---------- Eventos ----------
 document.addEventListener("DOMContentLoaded", () => {
   if (!$("fenixCompare")) return;
   $("cmpRun").addEventListener("click", cmpRun);
@@ -541,20 +850,61 @@ document.addEventListener("DOMContentLoaded", () => {
     cmpState.stop = true;
     $("cmpStatus").textContent = "Deteniendo al terminar el PDF actual...";
   });
+  ["cmpBaseYear", "cmpCompYear"].forEach((id) =>
+    $(id).addEventListener("change", () => {
+      const base = $("cmpBaseYear").value;
+      const comp = $("cmpCompYear").value;
+      if (base >= comp) {
+        $("cmpStatus").textContent = "El año de comparación debe ser posterior al año base.";
+        renderYearSelectors();
+        return;
+      }
+      saveJsonSafe(CMP.prefsKey, { base, comp });
+      $("cmpStatus").textContent = "";
+      renderCompare();
+    }),
+  );
   $("cmpResults").addEventListener("change", (event) => {
     const input = event.target.closest("[data-measure]");
-    if (!input) return;
-    const key = input.dataset.person;
-    cmpState.measures[key] = { ...(cmpState.measures[key] || {}), [input.dataset.measure]: input.value.trim() };
-    saveJsonSafe(CMP.measuresKey, cmpState.measures);
-    renderCompare();
+    if (input) cmpSaveInlineMeasure(input);
   });
-  $("cmpResults").addEventListener("click", async (event) => {
+  $("cmpResults").addEventListener("click", (event) => {
     if (event.target.closest("#cmpExport")) cmpExport();
-    if (event.target.closest("#cmpSave")) {
-      const ok = await cmpSaveToFolder();
-      hideBusy(ok, ok ? "Comparativo guardado en FENIX/Comparativo" : "Primero selecciona la carpeta SISO");
-    }
   });
+
+  // Registro de medidas
+  $("regSave").addEventListener("click", regSave);
+  $("regClear").addEventListener("click", regClearForm);
+  $("regExport").addEventListener("click", regExport);
+  $("regYear").addEventListener("change", () => {
+    regClearForm();
+    renderRegistry();
+  });
+  ["reg_peso_kg", "reg_estatura_cm"].forEach((id) => $(id).addEventListener("input", regUpdateImc));
+  $("regPerson").addEventListener("change", () => {
+    const person = regFindPerson($("regPerson").value);
+    const year = regFormYear();
+    if (!person) {
+      $("regPersonInfo").textContent = $("regPerson").value ? "No está en el Head Count ni en FENIX: se guardará con el nombre escrito." : "";
+      return;
+    }
+    const existing = cmpState.registry[year]?.[person.key];
+    if (existing) {
+      regLoadEntry(person.key);
+      return;
+    }
+    const before = measuresFor(person, String(Number(year) - 1));
+    $("regPersonInfo").textContent = before.peso_kg
+      ? `${Number(year) - 1}: peso ${before.peso_kg} kg${before.grasa_pct ? ` · grasa ${before.grasa_pct}%` : ""}${before.presion_arterial ? ` · PA ${before.presion_arterial}` : ""}`
+      : "Sin medidas del año anterior.";
+  });
+  $("regList").addEventListener("click", (event) => {
+    const edit = event.target.closest("[data-reg-edit]");
+    const del = event.target.closest("[data-reg-delete]");
+    if (edit) regLoadEntry(edit.dataset.regEdit);
+    if (del) regDelete(del.dataset.regDelete);
+  });
+  regClearForm();
+  renderRegistry();
   renderCompare();
 });

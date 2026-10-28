@@ -135,11 +135,15 @@ Las contrasenas no se guardan escritas en `app.js`; solo se guarda una huella ci
 
 Para cambiar o agregar un usuario, pidele a Claude que genere la huella nueva y la actualice en `app.js`. Las contrasenas se comunican a cada usuario de forma personal, nunca por GitHub.
 
-## Ganadores del Programa FENIX (2025 vs 2026)
+## Programa FENIX: registro de medidas y ganadores
 
-En Clinica Ocupacional -> Resultados FENIX -> "Ganadores del Programa FENIX":
+En Clinica Ocupacional -> Resultados FENIX:
 
-1. Guarda en `RESPALDO DE SISO/FENIX/Programa_2025` los archivos `FENIX_2025_antropometria.csv` y `FENIX_2025_signos_vitales.csv`.
-2. Carga la carpeta SISO y presiona `Leer laboratorios de los PDF`. SISO lee con OCR, en la computadora, los PDF de quienes tienen FENIX 2025 y 2026 (requiere internet solo para descargar el lector la primera vez).
-3. Se muestra el Top 15 por laboratorio. Anota peso, % de grasa y presion 2026 de esas personas y el Top 5 final se calcula solo.
-4. Lo leido y las medidas se guardan en `FENIX/Comparativo`, asi no se vuelve a leer lo mismo.
+**Registro de medidas FENIX**: en cada jornada anota peso, talla, % grasa, grasa visceral, masa muscular, cintura, presion y frecuencia cardiaca. Se guarda en `FENIX/Programa_<año>/FENIX_<año>_registro_medidas.csv` y se puede exportar a Excel.
+
+**Ganadores del Programa FENIX**: elige año base y año a comparar (2025 vs 2026, 2026 vs 2027...).
+
+1. Medidas de años anteriores importadas desde Excel: `FENIX/Programa_<año>/FENIX_<año>_antropometria.csv` y `FENIX_<año>_signos_vitales.csv`.
+2. `Leer laboratorios de los PDF` lee con OCR, en la computadora, los PDF de quienes tienen FENIX en ambos años (requiere internet solo para descargar el lector).
+3. Top 15 por laboratorio; las medidas del año comparado se toman del Registro o se escriben en la tabla (tambien quedan en el Registro). El Top 5 final se calcula solo.
+4. Lo leido por OCR se guarda en `FENIX/Comparativo` para no leerlo dos veces.
