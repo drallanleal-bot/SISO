@@ -215,8 +215,13 @@ function renderYearSelectors() {
   const fill = (id, value) => {
     const select = $(id);
     if (!select) return;
-    select.innerHTML = years.map((y) => `<option value="${y}" ${y === value ? "selected" : ""}>${y}</option>`).join("");
+    select.disabled = !years.length;
+    select.innerHTML = years.length
+      ? years.map((y) => `<option value="${y}" ${y === value ? "selected" : ""}>${y}</option>`).join("")
+      : '<option value="">Carga la carpeta</option>';
   };
+  const empty = $("cmpEmpty");
+  if (empty) empty.hidden = Boolean(state.fenixRecords.length);
   fill("cmpBaseYear", base);
   fill("cmpCompYear", comp);
   document.querySelectorAll("[data-cmp-base]").forEach((el) => (el.textContent = base));
@@ -875,6 +880,7 @@ async function cmpSaveInlineMeasure(input) {
 document.addEventListener("DOMContentLoaded", () => {
   if (!$("fenixCompare")) return;
   $("cmpRun").addEventListener("click", cmpRun);
+  $("cmpLoadFolder").addEventListener("click", () => $("loadSisoFolder").click());
   $("cmpStop").addEventListener("click", () => {
     cmpState.stop = true;
     $("cmpStatus").textContent = "Deteniendo al terminar el PDF actual...";

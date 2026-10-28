@@ -2266,3 +2266,37 @@ button:disabled {
     flex-direction: column;
   }
 }
+
+.cmp-empty {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  padding: 16px;
+  border-radius: 12px;
+  background: #fef3c7;
+  color: #78350f;
+}
+
+.cmp-empty[hidden] {
+  display: none;
+}
+
+.cmp-empty > span {
+  font-size: 34px;
+}
+
+.cmp-empty div {
+  flex: 1 1 260px;
+}
+
+.cmp-empty p {
+  margin: 4px 0 0;
+  font-size: 14px;
+}
+
+select:disabled {
+  color: var(--muted);
+  background: #f1f5f4;
+}
