@@ -147,3 +147,12 @@ En Clinica Ocupacional -> Resultados FENIX:
 2. `Leer laboratorios de los PDF` lee con OCR, en la computadora, los PDF de quienes tienen FENIX en ambos años (requiere internet solo para descargar el lector).
 3. Top 15 por laboratorio; las medidas del año comparado se toman del Registro o se escriben en la tabla (tambien quedan en el Registro). El Top 5 final se calcula solo.
 4. Lo leido por OCR se guarda en `FENIX/Comparativo` para no leerlo dos veces.
+
+## Registro de atenciones (Clinica Medica y Clinica Odontologica)
+
+- Cada usuario registra con su propia cuenta. SISO guarda un archivo por clinica, mes y usuario:
+  `Atenciones/<año>/<MM Mes año>/Clinica_Medica_<USUARIO>.csv` (o `Clinica_Dental_...`). Asi dos personas pueden registrar al mismo tiempo sin pisarse.
+- Al escribir codigo o nombre se llenan los datos del Head Count (puesto, fecha de nacimiento, edad, genero, tipo de paciente). Para eso el Head Count debe incluir `fecha_nacimiento`, `sexo` y `tipo_contrato`.
+- Diagnosticos con buscador CIE-10 (catalogo en `cie10.js`); se guarda la descripcion y el codigo.
+- Solo quien registro una atencion (o DRLEAL) puede editarla o quitarla.
+- `Actualizar` vuelve a leer la carpeta para ver lo registrado por otros usuarios; `Exportar Excel del mes` genera las mismas columnas del formato de ingreso.

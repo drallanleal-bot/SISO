@@ -283,7 +283,7 @@ function measuresFor(person, year) {
 }
 
 // ---------- Carga desde la carpeta SISO ----------
-window.onSisoFolderLoaded = async (csvFiles) => {
+(window.sisoFolderHooks = window.sisoFolderHooks || []).push(async (csvFiles) => {
   for (const item of csvFiles) {
     const path = normalizeText(item.path);
     const year = path.match(/fenix_(20\d{2})_/)?.[1];
@@ -299,7 +299,7 @@ window.onSisoFolderLoaded = async (csvFiles) => {
   }
   renderRegistry();
   renderCompare();
-};
+});
 
 function mergeOcrCsv(text) {
   cmpRowsFromCsv(text).forEach((row) => {

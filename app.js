@@ -1099,17 +1099,32 @@ function headcountFromCsv(text) {
   const nameIndex = findColumn(headers, ["nombre", "colaborador", "trabajador"]);
   const managementIndex = findColumn(headers, ["gerencia", "area", "departamento"]);
   const cecoIndex = findColumn(headers, ["ceco", "centro", "costo"]);
+  // Columnas opcionales que usa el registro de atenciones para llenar datos solos.
+  const optional = {
+    puesto: findColumn(headers, ["puesto"]),
+    area_personal: findColumn(headers, ["area_personal"]),
+    fecha_nacimiento: findColumn(headers, ["fecha_nacimiento", "nacim"]),
+    sexo: findColumn(headers, ["sexo", "genero"]),
+    tipo_contrato: findColumn(headers, ["tipo_contrato", "relacion"]),
+    dpi: findColumn(headers, ["dpi", "cui"]),
+  };
   if (codeIndex < 0 || nameIndex < 0) {
     throw new Error("El CSV debe tener columnas de codigo y nombre.");
   }
   return rows
     .slice(1)
-    .map((row) => ({
-      codigo: String(row[codeIndex] || "").trim(),
-      nombre: String(row[nameIndex] || "").trim().toUpperCase(),
-      gerencia: String(row[managementIndex] || "").trim().toUpperCase(),
-      ceco: String(row[cecoIndex] || "").trim(),
-    }))
+    .map((row) => {
+      const person = {
+        codigo: String(row[codeIndex] || "").trim(),
+        nombre: String(row[nameIndex] || "").trim().toUpperCase(),
+        gerencia: String(row[managementIndex] || "").trim().toUpperCase(),
+        ceco: String(row[cecoIndex] || "").trim(),
+      };
+      Object.entries(optional).forEach(([key, index]) => {
+        if (index >= 0 && String(row[index] || "").trim()) person[key] = String(row[index]).trim();
+      });
+      return person;
+    })
     .filter((person) => person.codigo && person.nombre);
 }
 
@@ -1383,8 +1398,10 @@ function consolidatedPriority(item) {
   return 9;
 }
 
+// CSV de modulos propios (FENIX, Atenciones de clinicas): no son vacunas ni Head Count.
 function isFenixPath(path) {
-  return normalizeText(path).replaceAll("\\", "/").startsWith("fenix/");
+  const p = normalizeText(path).replaceAll("\\", "/");
+  return p.startsWith("fenix/") || p.startsWith("atenciones/");
 }
 
 function isFenixIndexCsv(path) {
@@ -1633,7 +1650,13 @@ async function loadSisoFolder(presetDirectory) {
     if (fenixLoaded) {
       $("fenixSummary").textContent = `Indice FENIX cargado desde ${fenixIndex.path}: ${formatNumber(fenixLoaded)} resultados PDF disponibles.`;
     }
-    if (typeof window.onSisoFolderLoaded === "function") await window.onSisoFolderLoaded(csvFiles, directory);
+    for (const hook of window.sisoFolderHooks || []) {
+      try {
+        await hook(csvFiles, directory);
+      } catch (error) {
+        console.warn("Error al cargar un modulo desde la carpeta", error);
+      }
+    }
     hideBusy(true, `Listo: ${formatNumber(state.data.records.length)} registros cargados`);
   } catch (error) {
     if (error.name !== "AbortError") hideBusy(false, "No se pudo cargar la carpeta");

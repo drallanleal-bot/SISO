@@ -2388,3 +2388,237 @@ select:disabled {
   font-size: 18px;
   color: #b45309;
 }
+
+/* ---------- Registro de atenciones (Clínica Médica / Dental) ---------- */
+.at-root {
+  display: grid;
+  gap: 18px;
+}
+
+.at-form-panel {
+  border-top: 5px solid var(--tile-med);
+}
+
+#odontologia .at-form-panel {
+  border-top-color: var(--tile-odo);
+}
+
+.at-date {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.at-person-search input {
+  width: 100%;
+  min-height: 54px;
+  font-size: 17px;
+  padding: 0 16px;
+  border-radius: 12px;
+  border: 2px solid var(--tile-med);
+}
+
+.at-person-info {
+  min-height: 20px;
+  margin: 8px 2px 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--tile-med);
+}
+
+.at-section-title {
+  margin: 18px 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+  font-size: 15px;
+  color: var(--green);
+}
+
+.at-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.at-field {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  min-width: 0;
+}
+
+.at-field[hidden] {
+  display: none;
+}
+
+.at-field textarea {
+  min-height: 60px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 400;
+  color: var(--ink);
+  resize: vertical;
+}
+
+.at-field input[readonly] {
+  background: #f1f5f4;
+}
+
+.at-ac {
+  position: relative;
+}
+
+.at-ac input {
+  width: 100%;
+}
+
+.at-suggest {
+  position: absolute;
+  z-index: 30;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  max-height: 320px;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.16);
+}
+
+.at-suggest[hidden] {
+  display: none;
+}
+
+.at-suggest button {
+  display: grid;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  text-align: left;
+  background: #fff;
+  border-radius: 0;
+  border-bottom: 1px solid #eef2f1;
+  font-weight: 400;
+  color: var(--ink);
+}
+
+.at-suggest button b {
+  font-size: 13px;
+}
+
+.at-suggest button small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.at-suggest button:hover,
+.at-suggest button.active {
+  background: var(--green-2);
+}
+
+.at-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.at-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 4px 4px 10px;
+  border-radius: 999px;
+  background: #eef4ff;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.at-chip button {
+  min-height: 24px;
+  width: 24px;
+  padding: 0;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--red);
+}
+
+.at-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.at-actions small {
+  color: var(--red);
+  font-weight: 700;
+}
+
+.at-list-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.at-filter {
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.at-table td small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.at-table tr.at-no {
+  background: #fff7f7;
+}
+
+.at-row-actions {
+  white-space: nowrap;
+}
+
+.at-row-actions button {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 12px;
+  margin-right: 4px;
+}
+
+@media (max-width: 1050px) {
+  .at-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .at-field[style*="span 3"],
+  .at-field[style*="span 2"] {
+    grid-column: 1 / -1 !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .at-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .at-field[style] {
+    grid-column: auto !important;
+  }
+
+  .at-list-tools,
+  .at-list-tools > * {
+    width: 100%;
+  }
+}
