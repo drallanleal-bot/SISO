@@ -40,7 +40,7 @@ const AT_CONFIG = {
     tiposPaciente: ["Fijos", "Temporales", "Externos", "Familiares", "Pre-Empleos"],
     providers: ["Dr. Javier Amenabar", "Dr. Allan Leal", "Médico Externo"],
     providerByUser: { DRLEAL: "Dr. Allan Leal", CLINICAMEDICAIAK: "Dr. Javier Amenabar", CLINICAMEDICACUBREIAK: "Médico Externo" },
-    extraPerson: [{ key: "dpi", label: "DPI", type: "text", inputmode: "numeric" }],
+    extraPerson: [],
     sections: [
       {
         title: "Atención",
@@ -87,7 +87,7 @@ const AT_CONFIG = {
     ],
     exportColumns: [
       ["FECHA", "fecha"], ["CÓDIGO EMPLEADO", "codigo"], ["NOMBRE", "nombre"], ["TIPO PACIENTE", "tipo_paciente"], ["ÁREA O DEPARTAMENTO", "area"],
-      ["PUESTO", "puesto"], ["FECHA DE NACIMIENTO", "fecha_nacimiento"], ["DPI", "dpi"], ["EDAD", "edad"], ["GÉNERO", "genero"],
+      ["PUESTO", "puesto"], ["FECHA DE NACIMIENTO", "fecha_nacimiento"], ["EDAD", "edad"], ["GÉNERO", "genero"],
       ["¿QUIÉN BRINDA LA ATENCIÓN?", "brinda"], ["¿RECIBE LA ATENCIÓN?", "recibe"], ["TIPO DE CONSULTA", "tipo_consulta"],
       ["DIAGNÓSTICO PRINCIPAL", "dx_principal"], ["CIE-10 PRINCIPAL", "dx_principal_codigo"], ["DIAGNÓSTICOS SECUNDARIOS", "dx_secundarios"],
       ["PACIENTE CRÓNICO", "cronico"], ["TIPO DE ENFERMEDAD CRÓNICA", "tipo_cronica"], ["MEDICAMENTOS PRESCRITOS", "medicamentos"],
@@ -442,6 +442,12 @@ function atRender(cfg) {
     atFillPerson(cfg, item.person, item.origen);
     $(`${cfg.id}_buscarPersona`).value = "";
   });
+  const codeInput = atInput(cfg, "codigo");
+  codeInput.addEventListener("input", () => {
+    delete codeInput.dataset.filled;
+    atOnCodeTyped(cfg);
+  });
+  codeInput.addEventListener("change", () => atOnCodeTyped(cfg));
   // CIE-10
   root.querySelectorAll("[data-at-cie]").forEach((input) => {
     atAttachAutocomplete(
@@ -564,21 +570,98 @@ function atUpdateVisibility(cfg) {
   });
 }
 
+// ---------- Llenado automatico desde el Head Count ----------
+function atHeadcountByCode(code) {
+  const c = normalizeCode(code).replace(/^0+/, "");
+  if (!c) return null;
+  return (state.data?.headcount || []).find((p) => normalizeCode(p.codigo).replace(/^0+/, "") === c) || null;
+}
+
+// Area de la ultima atencion de la persona en cualquier clinica.
+function atAnyLastArea(p) {
+  const key = atPersonKey(p);
+  const r = atState.records.filter((x) => x.area && atPersonKey(x) === key).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)))[0];
+  return r?.area || "";
+}
+
+// Reglas por centro de costo / gerencia del Head Count. Primero manda lo que
+// la clinica ya ha elegido antes para ese mismo centro de costo.
+const AT_AREA_RULES = [
+  [/taller mec|mantenimiento/, "MANTENIMIENTO"],
+  [/aseg\.? calidad/, "CALIDAD"],
+  [/calidad|laboratorio/, "LABORATORIO DE CALIDAD"],
+  [/ehs|\bshe\b/, "SHE"],
+  [/exportac/, "EXPORTACIÓN"],
+  [/bodega mat|bod\. rep|jefatura bodegas/, "BODEGA MATERIA PRIMA Y SUMINISTROS"],
+  [/prod\. term|bod\. pt|cedi|dist|may y sup/, "BODEGA PRODUCTO TERMINADO"],
+  [/jarabe|bebi/, "FORMUACIÓN BEBIDAS"],
+  [/invest&desarr|invest & desarr/, "FORMULACIÓN ALIMENTOS"],
+  [/proyectos|tpm/, "PROYECTOS"],
+  [/cip|tetra|linea ?21/, "PRODUCCIÓN BEBIDAS IAK"],
+  [/frijol|tomate|mespack|delta pack|salsit|linea|dosimetria|pacto colectivo|gastos indirectos al|control de operacion|produccion|manufactura/, "PRODUCCCIÓN ALIMENTOS IAK"],
+  [/compras/, "COMPRAS"],
+  [/contab|impuestos|credito|planillas/, "CONTABILIDAD"],
+  [/auditoria/, "AUDITORÍA"],
+  [/recursos humanos|admin.* rh|talento/, "TALENTO"],
+  [/trade|diageo|mercadeo|revenue|intel\. de merc/, "MERCADEO"],
+  [/venta|vtas|comerc|telemarketing|region/, "VENTAS"],
+  [/merc/, "MERCADEO"],
+];
+
+function atAreaFromHeadcount(p) {
+  if (!p || !p.ceco) return "";
+  const learned = new Map();
+  const ceco = p.ceco;
+  atState.records.forEach((r) => {
+    if (!r.area) return;
+    const h = atHeadcountByCode(r.codigo);
+    if (h && h.ceco === ceco) learned.set(r.area, (learned.get(r.area) || 0) + 1);
+  });
+  if (learned.size) return [...learned.entries()].sort((a, b) => b[1] - a[1])[0][0];
+  const text = normalizeText(`${p.ceco} ${p.gerencia || ""}`);
+  const rule = AT_AREA_RULES.find(([re]) => re.test(text));
+  return rule ? rule[1] : "ADMINISTRACIÓN";
+}
+
+// Al escribir el codigo directo en "Codigo empleado" se llena todo solo.
+function atOnCodeTyped(cfg) {
+  const code = atGetValue(cfg, "codigo");
+  const msg = $(`${cfg.id}_personInfo`);
+  if (!code) return;
+  const hc = atHeadcountByCode(code);
+  if (hc) {
+    if (atInput(cfg, "codigo").dataset.filled === hc.codigo) return;
+    atFillPerson(cfg, hc, hc.gerencia || "Head Count");
+    atInput(cfg, "codigo").dataset.filled = hc.codigo;
+    return;
+  }
+  const key = atPersonKey({ codigo: code });
+  const prev = atState.records.filter((r) => atPersonKey(r) === key).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)))[0];
+  if (prev) {
+    if (atInput(cfg, "codigo").dataset.filled === code) return;
+    atFillPerson(cfg, prev, "Atención previa");
+    atInput(cfg, "codigo").dataset.filled = code;
+    return;
+  }
+  if (!(state.data?.headcount || []).length) msg.textContent = "⚠️ El Head Count no está cargado: conecta la carpeta SISO para que los datos se llenen solos.";
+  else if (code.length >= 4) msg.textContent = `El código ${code} no está en el Head Count actual. Llena los datos a mano.`;
+}
+
 function atFillPerson(cfg, p, origen) {
   atSetValue(cfg, "codigo", normalizeCode(p.codigo));
   atSetValue(cfg, "nombre", p.nombre || "");
   atSetValue(cfg, "puesto", p.puesto || "");
   atSetValue(cfg, "fecha_nacimiento", normalizeDate(p.fecha_nacimiento) || "");
   atSetValue(cfg, "genero", p.sexo || p.genero || "");
-  if (cfg.extraPerson.some((f) => f.key === "dpi")) atSetValue(cfg, "dpi", p.dpi || "");
   const tipo = p.tipo_paciente || p.tipo_contrato || "";
   if (cfg.tiposPaciente.includes(tipo)) atSetValue(cfg, "tipo_paciente", tipo);
-  if (p.area) atSetValue(cfg, "area", p.area);
   // Datos de su ultima atencion en esta clinica
   const last = atLastRecord(cfg, p, atState.editing[cfg.id]);
+  const hc = atHeadcountByCode(p.codigo);
+  const area = p.area || last?.area || atAnyLastArea(p) || atAreaFromHeadcount(hc || p);
+  if (area) atSetValue(cfg, "area", area);
+  if (!p.puesto && hc?.puesto) atSetValue(cfg, "puesto", hc.puesto);
   if (last) {
-    if (!atGetValue(cfg, "area") && last.area) atSetValue(cfg, "area", last.area);
-    if (!atGetValue(cfg, "dpi") && last.dpi) atSetValue(cfg, "dpi", last.dpi);
     if (!atGetValue(cfg, "tipo_paciente") && last.tipo_paciente) atSetValue(cfg, "tipo_paciente", last.tipo_paciente);
     if (cfg.id === "medica" && last.cronico === "SI" && !atState.editing[cfg.id]) {
       atSetValue(cfg, "cronico", "SI");
@@ -592,6 +675,7 @@ function atFillPerson(cfg, p, origen) {
   if (!thisYear.length && !atState.editing[cfg.id] && !atGetValue(cfg, "tipo_consulta")) atSetValue(cfg, "tipo_consulta", "Primera Consulta");
   const info = [];
   info.push(origen ? `Origen: ${origen}` : "");
+  if (hc?.ceco) info.push(hc.ceco);
   info.push(
     last
       ? `Última atención: ${formatDate(last.fecha)}${last.dx_principal ? ` · ${last.dx_principal}` : last.motivo_consulta ? ` · ${last.motivo_consulta}` : ""}`
@@ -605,6 +689,7 @@ function atFillPerson(cfg, p, origen) {
 
 function atClearForm(cfg) {
   atState.editing[cfg.id] = null;
+  if (atInput(cfg, "codigo")) delete atInput(cfg, "codigo").dataset.filled;
   atAllFields(cfg).forEach((f) => {
     if (f.type === "cieMulti") atSetMulti(cfg, f.key, []);
     else {
